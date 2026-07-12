@@ -54,6 +54,12 @@ export default function LiveLeaderboard() {
   const [essayGrades, setEssayGrades] = useState<Record<string, number>>({});
   const [isSavingGrades, setIsSavingGrades] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<'wrong_and_essay' | 'all' | 'wrong' | 'essay'>('wrong_and_essay');
+  const [activeReviewIndex, setActiveReviewIndex] = useState(0);
+
+  const handleFilterChange = (filter: 'wrong_and_essay' | 'all' | 'wrong' | 'essay') => {
+    setReviewFilter(filter);
+    setActiveReviewIndex(0);
+  };
 
   const getQuestionPoints = (q: any) => {
     if (!selectedAttempt) return 0;
@@ -236,6 +242,7 @@ export default function LiveLeaderboard() {
       .eq('exam_id', examId);
 
     if (qData) setReviewQuestions(qData);
+    setActiveReviewIndex(0);
     setReviewLoading(false);
   };
 
@@ -406,12 +413,8 @@ export default function LiveLeaderboard() {
         '"Pelanggaran"', '"Status Submit"', '"Terakhir Update"'
       ];
       questions.forEach((q, i) => {
-        headers.push(`"Soal ${i + 1}: Pertanyaan"`);
-        headers.push(`"Soal ${i + 1}: Tipe"`);
-        headers.push(`"Soal ${i + 1}: Kunci"`);
         headers.push(`"Soal ${i + 1}: Jawaban Peserta"`);
-        headers.push(`"Soal ${i + 1}: Status"`);
-        headers.push(`"Soal ${i + 1}: Poin"`);
+        headers.push(`"Soal ${i + 1}: Skor"`);
       });
 
       const rows = filteredAttempts.map((item) => {
@@ -425,43 +428,22 @@ export default function LiveLeaderboard() {
           const correctKey = q.correct_answer || q.answer || '';
           const qType = q.options?.type || 'pg';
 
-          // 1. Pertanyaan
-          const cleanQText = `"${String(q.question_text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
-          
-          // 2. Tipe
-          const tipeText = qType.toUpperCase();
-
-          // 3. Kunci
-          let kunciText = correctKey;
-          if (qType === 'pg' && q.options?.points) {
-            const ptsObj = q.options.points;
-            const ptsStr = Object.entries(ptsObj)
-              .map(([opt, pt]) => `${opt}:${pt}p`)
-              .join(' | ');
-            kunciText = `${correctKey} (${ptsStr})`;
-          }
-          const cleanKunciText = `"${String(kunciText || '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
-
           // 4. Jawaban Peserta
           const cleanUserAns = userAns 
             ? `"${String(userAns).replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`
             : '"(kosong)"';
 
           // 5. Status & 6. Poin
-          let statusText = '';
           let pointEarned = 0;
 
           if (!userAns) {
             kosong++;
-            statusText = 'KOSONG';
             pointEarned = examConfig?.empty_point || 0;
           } else if (qType === 'essay') {
             const essayScore = item.answers?.essay_grades?.[q.id];
             if (essayScore === undefined) {
-              statusText = 'BELUM DINILAI';
               pointEarned = 0;
             } else {
-              statusText = 'ESSAY';
               pointEarned = Number(essayScore);
               if (pointEarned > 0) benar++; else salah++;
             }
@@ -470,11 +452,9 @@ export default function LiveLeaderboard() {
             const isCorrect = correctAnswers.includes(String(userAns).trim().toUpperCase());
             if (isCorrect) {
               benar++;
-              statusText = 'BENAR';
               pointEarned = Number(q.options?.points?.correct ?? examConfig?.correct_point ?? 4);
             } else {
               salah++;
-              statusText = 'SALAH';
               const penalty = examConfig?.penalty_point || 0;
               pointEarned = penalty <= 0 ? penalty : -penalty;
             }
@@ -489,31 +469,23 @@ export default function LiveLeaderboard() {
               pointEarned = pts;
               if (pts > 0) {
                 benar++;
-                statusText = 'BENAR';
               } else {
                 salah++;
-                statusText = 'SALAH';
               }
             } else {
               const isCorrect = String(userAns).trim().toUpperCase() === String(correctKey).trim().toUpperCase();
               if (isCorrect) {
                 benar++;
-                statusText = 'BENAR';
                 pointEarned = examConfig?.correct_point ?? 4;
               } else {
                 salah++;
-                statusText = 'SALAH';
                 const penalty = examConfig?.penalty_point || 0;
                 pointEarned = penalty <= 0 ? penalty : -penalty;
               }
             }
           }
 
-          qCols.push(cleanQText);
-          qCols.push(`"${tipeText}"`);
-          qCols.push(cleanKunciText);
           qCols.push(cleanUserAns);
-          qCols.push(`"${statusText}"`);
           qCols.push(String(pointEarned));
         });
 
@@ -708,7 +680,7 @@ export default function LiveLeaderboard() {
                     ].map((btn) => (
                       <button
                         key={btn.id}
-                        onClick={() => setReviewFilter(btn.id as any)}
+                        onClick={() => handleFilterChange(btn.id as any)}
                         className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all border ${
                           reviewFilter === btn.id
                             ? 'bg-[#5145cd] text-white border-[#5145cd] shadow-md shadow-indigo-100'
@@ -1051,18 +1023,43 @@ export default function LiveLeaderboard() {
             </div>
 
             {/* Footer Modal */}
-            <div className="bg-white px-8 py-4 border-t border-gray-100 flex justify-between items-center gap-4 flex-shrink-0">
-              <span className="text-xs font-bold text-gray-400">
-                * Pemberian poin essay membutuhkan klik tombol Simpan & Akumulasi Skor di sebelah kanan.
-              </span>
-              <div className="flex gap-3">
+            <div className="bg-white px-8 py-4 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 flex-shrink-0">
+              {/* Prev / Next Slider Navigation Controls */}
+              {!reviewLoading && (() => {
+                const filtered = getFilteredQuestions();
+                if (filtered.length === 0) return <div></div>;
+                const safeIndex = activeReviewIndex >= filtered.length ? 0 : activeReviewIndex;
+                return (
+                  <div className="flex items-center gap-2 shadow-inner bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-2xl">
+                    <button
+                      disabled={safeIndex === 0}
+                      onClick={() => setActiveReviewIndex(prev => Math.max(0, prev - 1))}
+                      className="px-3.5 py-1.5 bg-white border border-gray-200 text-[#5145cd] hover:bg-indigo-50 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-black rounded-xl transition-all flex items-center gap-1"
+                    >
+                      ← Prev
+                    </button>
+                    <span className="text-[10px] font-black text-slate-500 min-w-[90px] text-center">
+                      Soal {safeIndex + 1} dari {filtered.length}
+                    </span>
+                    <button
+                      disabled={safeIndex === filtered.length - 1}
+                      onClick={() => setActiveReviewIndex(prev => Math.min(filtered.length - 1, prev + 1))}
+                      className="px-3.5 py-1.5 bg-white border border-gray-200 text-[#5145cd] hover:bg-indigo-50 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-black rounded-xl transition-all flex items-center gap-1"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                );
+              })()}
+
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
                 <button
                   onClick={() => setShowReview(false)}
                   className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-black uppercase tracking-widest rounded-xl transition-all"
                 >
                   Tutup
                 </button>
-                 <button
+                <button
                   onClick={handleSaveEssayGrades}
                   disabled={isSavingGrades || !hasGradesChanged()}
                   className={`px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl flex items-center gap-2 transition-all ${
