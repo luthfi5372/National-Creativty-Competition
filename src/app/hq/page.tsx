@@ -3302,6 +3302,19 @@ function ModernHQDashboardContent() {
             width: 320px !important;
           }
         }
+        .sidebar-scroll::-webkit-scrollbar {
+          width: 4px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 4px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
+        }
       `}</style>
       {/* Ornamen Latar Belakang - Optimized */}
       <div className="absolute top-[-5%] left-[-5%] w-64 h-64 bg-blue-400/10 rounded-full blur-2xl pointer-events-none"></div>
@@ -3323,7 +3336,7 @@ function ModernHQDashboardContent() {
           </div>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 mt-4">
+        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto pb-8 sidebar-scroll">
           {[
             { id: "Dashboard", icon: <LayoutDashboard size={18} />, label: "Dashboard" },
             { id: "Peserta", icon: <Users size={18} />, label: "Buku Peserta", count: realEntries.length },
