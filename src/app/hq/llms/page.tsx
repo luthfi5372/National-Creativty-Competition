@@ -374,7 +374,7 @@ export default function IntegratedLLMSDashboard() {
         }`}
       >
         {/* Kolom Kiri: Ikon & Info Judul */}
-        <div className="flex items-center gap-4 min-w-0">
+        <div className="flex items-center gap-4 min-w-0 md:w-2/5 flex-grow">
           {/* Ikon Clipboard dengan dot status di pojok kanan bawah */}
           <div className="w-12 h-12 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center shrink-0 relative shadow-inner">
             <FileText className="w-5.5 h-5.5 text-slate-400" />
@@ -403,7 +403,7 @@ export default function IntegratedLLMSDashboard() {
         </div>
 
         {/* Kolom Tengah 1: Token & Durasi (dengan Tooltip premium) */}
-        <div className="flex flex-row md:flex-col justify-between md:justify-center items-center md:items-start gap-1 shrink-0 px-2">
+        <div className="flex flex-row md:flex-col justify-between md:justify-center items-center md:items-start gap-1 shrink-0 px-2 md:w-1/5">
           {/* Live Token */}
           <div className="flex items-center gap-1.5 text-cyan-600 bg-cyan-50 border border-cyan-100/50 px-3 py-1 rounded-xl shadow-sm hover:scale-105 transition-all duration-300">
             <Key className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
@@ -447,7 +447,7 @@ export default function IntegratedLLMSDashboard() {
         </div>
 
         {/* Kolom Tengah 2: Proctor / Pengawas */}
-        <div className="flex items-center gap-2.5 shrink-0 px-2">
+        <div className="flex items-center gap-2.5 shrink-0 px-2 md:w-1/6">
           <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100/50 flex items-center justify-center text-indigo-650 shrink-0 shadow-inner">
             <Users className="w-4 h-4 text-indigo-500" />
           </div>
@@ -460,7 +460,7 @@ export default function IntegratedLLMSDashboard() {
         </div>
 
         {/* Kolom Status Pill */}
-        <div className="shrink-0 flex items-center px-1">
+        <div className="shrink-0 flex items-center px-1 md:w-1/6 md:justify-end">
           <button
             onClick={() => handleToggleActive(session.id, isActive)}
             className={`px-4 py-1.5 rounded-full flex items-center gap-2 text-[11px] font-black border transition-all duration-300 shadow-sm active:scale-95 ${
@@ -481,7 +481,7 @@ export default function IntegratedLLMSDashboard() {
         </div>
 
         {/* Kolom Kanan: Aksi (Siaran & Dropdown Menu `...`) */}
-        <div className="flex items-center gap-2 shrink-0 justify-end">
+        <div className="flex items-center gap-2 shrink-0 justify-end md:w-1/12">
           <Link
             href="/hq/llms/broadcast"
             className="p-2 text-slate-400 hover:text-indigo-650 hover:bg-indigo-50 border border-transparent hover:border-indigo-100 rounded-xl transition-all duration-200 active:scale-90"
