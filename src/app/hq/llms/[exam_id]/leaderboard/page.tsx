@@ -48,6 +48,7 @@ export default function LiveLeaderboard() {
   const [allQuestions, setAllQuestions] = useState<any[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [examConfig, setExamConfig] = useState<any>(null);
+  const [showCsvModal, setShowCsvModal] = useState(false);
 
   // Review Modal state
   const [showReview, setShowReview] = useState(false);
@@ -434,7 +435,7 @@ export default function LiveLeaderboard() {
   };
 
   // Export detail: per question answer correctness
-  const downloadDetailCSV = async () => {
+  const downloadDetailCSV = async (format: 'horizontal' | 'vertical' = 'vertical') => {
     if (attempts.length === 0) return;
     setIsExporting(true);
     try {
@@ -444,145 +445,267 @@ export default function LiveLeaderboard() {
         if (data) questions.push(...data);
       }
 
-      // Build header dynamically: basic info + per-question details (grouped for readability)
-      const headers = [
-        '"Peringkat"', '"ID Peserta"', '"Nama Peserta"', '"Asal Sekolah"', '"Skor Total"', '"Jumlah Benar"', '"Jumlah Salah"', '"Jumlah Kosong"',
-        '"Pelanggaran"', '"Status Submit"', '"Terakhir Update"'
-      ];
-      questions.forEach((q, i) => {
-        headers.push(`"Soal ${i + 1}: Pertanyaan"`);
-        headers.push(`"Soal ${i + 1}: Jawaban Peserta"`);
-        headers.push(`"Soal ${i + 1}: Status"`);
-        headers.push(`"Soal ${i + 1}: Skor"`);
-      });
+      let csvContent = "";
 
-      const rows = filteredAttempts.map((item) => {
-        // Gunakan rank asli dari full attempts list
-        const realRank = attempts.findIndex(a => a.id === item.id) + 1;
-        let benar = 0, salah = 0, kosong = 0;
-        const qCols: string[] = [];
+      if (format === 'vertical') {
+        // Build header for vertical format
+        const headers = [
+          '"Peringkat"', '"ID Peserta"', '"Nama Peserta"', '"Asal Sekolah"', 
+          '"Nomor Soal"', '"Pertanyaan"', '"Jawaban Peserta"', '"Status Jawaban"', '"Skor Soal"',
+          '"Skor Total"', '"Pelanggaran"', '"Status Ujian"', '"Terakhir Update"'
+        ];
 
-        questions.forEach((q) => {
-          const userAns = item.answers?.[q.id];
-          const correctKey = q.correct_answer || q.answer || '';
-          const qType = q.options?.type || 'pg';
+        const rows: string[] = [];
 
-          // 1. Pertanyaan
-          const cleanQText = `"${String(q.question_text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+        filteredAttempts.forEach((item) => {
+          const realRank = attempts.findIndex(a => a.id === item.id) + 1;
+          const codeKey = String(item.user_id || '').toUpperCase();
+          const cleanCodeKey = codeKey.replace("NCC-", "");
+          const info = participantMap[codeKey] || participantMap[cleanCodeKey] || { full_name: "Peserta Anonim", school_name: "Asal Sekolah Tidak Diketahui" };
 
-          // 4. Jawaban Peserta (Spill Pilihan Ganda if qType is pg/standard MC)
-          let cleanUserAns = '"(kosong)"';
-          if (userAns) {
-            if (qType === 'essay' || qType === 'isian') {
-              cleanUserAns = `"${String(userAns).replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
-            } else {
-              // Pilihan Ganda (PG) - Spill the answer option text
-              const selectedLetters = String(userAns).split('');
-              const spilledOptions = selectedLetters.map(letter => {
-                const upperL = letter.toUpperCase();
-                const optionText = q.options?.[upperL] || q.options?.[letter.toLowerCase()] || '';
-                return optionText ? `${upperL} (${optionText})` : upperL;
-              });
-              const combinedText = spilledOptions.join(' | ');
-              cleanUserAns = `"${combinedText.replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
-            }
-          }
+          questions.forEach((q, index) => {
+            const userAns = item.answers?.[q.id];
+            const correctKey = q.correct_answer || q.answer || '';
+            const qType = q.options?.type || 'pg';
 
-          // 5. Status & 6. Poin
-          let statusText = '';
-          let pointEarned = 0;
+            // 1. Pertanyaan
+            const cleanQText = `"${String(q.question_text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
 
-          if (!userAns) {
-            kosong++;
-            statusText = 'KOSONG';
-            pointEarned = examConfig?.empty_point || 0;
-          } else if (qType === 'essay') {
-            const essayScore = item.answers?.essay_grades?.[q.id];
-            if (essayScore === undefined) {
-              statusText = 'BELUM DINILAI';
-              pointEarned = 0;
-            } else {
-              statusText = 'ESSAY';
-              pointEarned = Number(essayScore);
-              if (pointEarned > 0) benar++; else salah++;
-            }
-          } else if (qType === 'isian') {
-            const correctAnswers = String(correctKey).toUpperCase().split('|').map((x) => x.trim());
-            const isCorrect = correctAnswers.includes(String(userAns).trim().toUpperCase());
-            if (isCorrect) {
-              benar++;
-              statusText = 'BENAR';
-              pointEarned = Number(q.options?.points?.correct ?? examConfig?.correct_point ?? 4);
-            } else {
-              salah++;
-              statusText = 'SALAH';
-              const penalty = examConfig?.penalty_point || 0;
-              pointEarned = penalty <= 0 ? penalty : -penalty;
-            }
-          } else {
-            // PG
-            if (q.options && typeof q.options === 'object' && q.options.points) {
-              const selectedLetters = String(userAns).split('');
-              let pts = 0;
-              selectedLetters.forEach((l) => {
-                pts += Number(q.options.points[l] || 0);
-              });
-              pointEarned = pts;
-              if (pts > 0) {
-                benar++;
-                statusText = 'BENAR';
+            // 2. Jawaban Peserta (Spill Pilihan Ganda if qType is pg/standard MC)
+            let cleanUserAns = '"(kosong)"';
+            if (userAns) {
+              if (qType === 'essay' || qType === 'isian') {
+                cleanUserAns = `"${String(userAns).replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
               } else {
-                salah++;
+                // Pilihan Ganda (PG) - Spill the answer option text
+                const selectedLetters = String(userAns).split('');
+                const spilledOptions = selectedLetters.map(letter => {
+                  const upperL = letter.toUpperCase();
+                  const optionText = q.options?.[upperL] || q.options?.[letter.toLowerCase()] || '';
+                  return optionText ? `${upperL} (${optionText})` : upperL;
+                });
+                const combinedText = spilledOptions.join(' | ');
+                cleanUserAns = `"${combinedText.replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+              }
+            }
+
+            // 3. Status & Poin
+            let statusText = '';
+            let pointEarned = 0;
+
+            if (!userAns) {
+              statusText = 'KOSONG';
+              pointEarned = examConfig?.empty_point || 0;
+            } else if (qType === 'essay') {
+              const essayScore = item.answers?.essay_grades?.[q.id];
+              if (essayScore === undefined) {
+                statusText = 'BELUM DINILAI';
+                pointEarned = 0;
+              } else {
+                statusText = 'ESSAY';
+                pointEarned = Number(essayScore);
+              }
+            } else if (qType === 'isian') {
+              const correctAnswers = String(correctKey).toUpperCase().split('|').map((x) => x.trim());
+              const isCorrect = correctAnswers.includes(String(userAns).trim().toUpperCase());
+              if (isCorrect) {
+                statusText = 'BENAR';
+                pointEarned = Number(q.options?.points?.correct ?? examConfig?.correct_point ?? 4);
+              } else {
                 statusText = 'SALAH';
+                const penalty = examConfig?.penalty_point || 0;
+                pointEarned = penalty <= 0 ? penalty : -penalty;
               }
             } else {
-              const isCorrect = String(userAns).trim().toUpperCase() === String(correctKey).trim().toUpperCase();
+              // PG
+              if (q.options && typeof q.options === 'object' && q.options.points) {
+                const selectedLetters = String(userAns).split('');
+                let pts = 0;
+                selectedLetters.forEach((l) => {
+                  pts += Number(q.options.points[l] || 0);
+                });
+                pointEarned = pts;
+                if (pts > 0) {
+                  statusText = 'BENAR';
+                } else {
+                  statusText = 'SALAH';
+                }
+              } else {
+                const isCorrect = String(userAns).trim().toUpperCase() === String(correctKey).trim().toUpperCase();
+                if (isCorrect) {
+                  statusText = 'BENAR';
+                  pointEarned = examConfig?.correct_point ?? 4;
+                } else {
+                  statusText = 'SALAH';
+                  const penalty = examConfig?.penalty_point || 0;
+                  pointEarned = penalty <= 0 ? penalty : -penalty;
+                }
+              }
+            }
+
+            const row = [
+              realRank,
+              `"${item.user_id}"`,
+              `"${(info.full_name || '').replace(/"/g, '""')}"`,
+              `"${(info.school_name || '').replace(/"/g, '""')}"`,
+              `"Soal ${index + 1}"`,
+              cleanQText,
+              cleanUserAns,
+              `"${statusText}"`,
+              pointEarned,
+              checkHasUngradedEssay(item, questions) ? '"Ditinjau"' : (item.score ?? 0),
+              item.violations_count || 0,
+              `"${item.submitted_at ? 'SELESAI' : 'BERLANGSUNG'}"`,
+              `"${new Date(item.updated_at).toLocaleString('id-ID')}"`
+            ];
+
+            rows.push(row.join(','));
+          });
+        });
+
+        csvContent = "\uFEFF" + headers.join(',') + "\n" + rows.join("\n");
+      } else {
+        // Build header dynamically: basic info + per-question details (grouped for readability)
+        const headers = [
+          '"Peringkat"', '"ID Peserta"', '"Nama Peserta"', '"Asal Sekolah"', '"Skor Total"', '"Jumlah Benar"', '"Jumlah Salah"', '"Jumlah Kosong"',
+          '"Pelanggaran"', '"Status Submit"', '"Terakhir Update"'
+        ];
+        questions.forEach((q, i) => {
+          headers.push(`"Soal ${i + 1}: Pertanyaan"`);
+          headers.push(`"Soal ${i + 1}: Jawaban Peserta"`);
+          headers.push(`"Soal ${i + 1}: Status"`);
+          headers.push(`"Soal ${i + 1}: Skor"`);
+        });
+
+        const rows = filteredAttempts.map((item) => {
+          // Gunakan rank asli dari full attempts list
+          const realRank = attempts.findIndex(a => a.id === item.id) + 1;
+          let benar = 0, salah = 0, kosong = 0;
+          const qCols: string[] = [];
+
+          questions.forEach((q) => {
+            const userAns = item.answers?.[q.id];
+            const correctKey = q.correct_answer || q.answer || '';
+            const qType = q.options?.type || 'pg';
+
+            // 1. Pertanyaan
+            const cleanQText = `"${String(q.question_text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+
+            // 4. Jawaban Peserta (Spill Pilihan Ganda if qType is pg/standard MC)
+            let cleanUserAns = '"(kosong)"';
+            if (userAns) {
+              if (qType === 'essay' || qType === 'isian') {
+                cleanUserAns = `"${String(userAns).replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+              } else {
+                // Pilihan Ganda (PG) - Spill the answer option text
+                const selectedLetters = String(userAns).split('');
+                const spilledOptions = selectedLetters.map(letter => {
+                  const upperL = letter.toUpperCase();
+                  const optionText = q.options?.[upperL] || q.options?.[letter.toLowerCase()] || '';
+                  return optionText ? `${upperL} (${optionText})` : upperL;
+                });
+                const combinedText = spilledOptions.join(' | ');
+                cleanUserAns = `"${combinedText.replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+              }
+            }
+
+            // 5. Status & 6. Poin
+            let statusText = '';
+            let pointEarned = 0;
+
+            if (!userAns) {
+              kosong++;
+              statusText = 'KOSONG';
+              pointEarned = examConfig?.empty_point || 0;
+            } else if (qType === 'essay') {
+              const essayScore = item.answers?.essay_grades?.[q.id];
+              if (essayScore === undefined) {
+                statusText = 'BELUM DINILAI';
+                pointEarned = 0;
+              } else {
+                statusText = 'ESSAY';
+                pointEarned = Number(essayScore);
+                if (pointEarned > 0) benar++; else salah++;
+              }
+            } else if (qType === 'isian') {
+              const correctAnswers = String(correctKey).toUpperCase().split('|').map((x) => x.trim());
+              const isCorrect = correctAnswers.includes(String(userAns).trim().toUpperCase());
               if (isCorrect) {
                 benar++;
                 statusText = 'BENAR';
-                pointEarned = examConfig?.correct_point ?? 4;
+                pointEarned = Number(q.options?.points?.correct ?? examConfig?.correct_point ?? 4);
               } else {
                 salah++;
                 statusText = 'SALAH';
                 const penalty = examConfig?.penalty_point || 0;
                 pointEarned = penalty <= 0 ? penalty : -penalty;
               }
+            } else {
+              // PG
+              if (q.options && typeof q.options === 'object' && q.options.points) {
+                const selectedLetters = String(userAns).split('');
+                let pts = 0;
+                selectedLetters.forEach((l) => {
+                  pts += Number(q.options.points[l] || 0);
+                });
+                pointEarned = pts;
+                if (pts > 0) {
+                  benar++;
+                  statusText = 'BENAR';
+                } else {
+                  salah++;
+                  statusText = 'SALAH';
+                }
+              } else {
+                const isCorrect = String(userAns).trim().toUpperCase() === String(correctKey).trim().toUpperCase();
+                if (isCorrect) {
+                  benar++;
+                  statusText = 'BENAR';
+                  pointEarned = examConfig?.correct_point ?? 4;
+                } else {
+                  salah++;
+                  statusText = 'SALAH';
+                  const penalty = examConfig?.penalty_point || 0;
+                  pointEarned = penalty <= 0 ? penalty : -penalty;
+                }
+              }
             }
-          }
 
-          qCols.push(cleanQText);
-          qCols.push(cleanUserAns);
-          qCols.push(`"${statusText}"`);
-          qCols.push(String(pointEarned));
+            qCols.push(cleanQText);
+            qCols.push(cleanUserAns);
+            qCols.push(`"${statusText}"`);
+            qCols.push(String(pointEarned));
+          });
+
+          const codeKey = String(item.user_id || '').toUpperCase();
+          const cleanCodeKey = codeKey.replace("NCC-", "");
+          const info = participantMap[codeKey] || participantMap[cleanCodeKey] || { full_name: "Peserta Anonim", school_name: "Asal Sekolah Tidak Diketahui" };
+
+          const rowMeta = [
+            realRank,
+            `"${item.user_id}"`,
+            `"${(info.full_name || '').replace(/"/g, '""')}"`,
+            `"${(info.school_name || '').replace(/"/g, '""')}"`,
+            checkHasUngradedEssay(item, questions) ? '"Ditinjau"' : (item.score ?? 0),
+            benar,
+            salah,
+            kosong,
+            item.violations_count || 0,
+            `"${item.submitted_at ? 'SELESAI' : 'BERLANGSUNG'}"`,
+            `"${new Date(item.updated_at).toLocaleString('id-ID')}"`
+          ];
+
+          return [...rowMeta, ...qCols].join(',');
         });
 
-        const codeKey = String(item.user_id || '').toUpperCase();
-        const cleanCodeKey = codeKey.replace("NCC-", "");
-        const info = participantMap[codeKey] || participantMap[cleanCodeKey] || { full_name: "Peserta Anonim", school_name: "Asal Sekolah Tidak Diketahui" };
+        csvContent = "\uFEFF" + headers.join(',') + "\n" + rows.join("\n");
+      }
 
-        const rowMeta = [
-          realRank,
-          `"${item.user_id}"`,
-          `"${(info.full_name || '').replace(/"/g, '""')}"`,
-          `"${(info.school_name || '').replace(/"/g, '""')}"`,
-          checkHasUngradedEssay(item, questions) ? '"Ditinjau"' : (item.score ?? 0),
-          benar,
-          salah,
-          kosong,
-          item.violations_count || 0,
-          `"${item.submitted_at ? 'SELESAI' : 'BERLANGSUNG'}"`,
-          `"${new Date(item.updated_at).toLocaleString('id-ID')}"`
-        ];
-
-        return [...rowMeta, ...qCols].join(',');
-      });
-
-      const csvContent = "\uFEFF" + headers.join(',') + "\n" + rows.join("\n");
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `Detail_Jawaban_NCC13_${examId.split('-')[0]}_${new Date().toLocaleDateString('id-ID').replace(/\//g,'-')}.csv`);
+      link.setAttribute('download', `Detail_Jawaban_${format === 'vertical' ? 'Vertikal' : 'Horizontal'}_NCC13_${examId.split('-')[0]}_${new Date().toLocaleDateString('id-ID').replace(/\//g,'-')}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -672,6 +795,72 @@ export default function LiveLeaderboard() {
               <button onClick={handleDeleteParticipant} disabled={isDeleting} className="flex-1 py-3.5 bg-rose-500 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-rose-600 transition-all shadow-lg shadow-rose-100 flex items-center justify-center gap-2">
                 {isDeleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 {isDeleting ? 'Menghapus...' : 'Hapus'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL FORMAT EKSPOR CSV ===== */}
+      {showCsvModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[24px] w-full max-w-md p-6 shadow-2xl border border-gray-100 flex flex-col">
+            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+              <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
+                <Download className="w-5 h-5 text-[#5145cd]" /> Format Ekspor CSV
+              </h3>
+              <button 
+                onClick={() => setShowCsvModal(false)}
+                className="w-8 h-8 hover:bg-gray-100 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="py-6 space-y-4">
+              <button
+                onClick={() => {
+                  downloadDetailCSV('vertical');
+                  setShowCsvModal(false);
+                }}
+                className="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-[#5145cd] hover:bg-indigo-50/30 transition-all flex items-start gap-3"
+              >
+                <div className="mt-0.5 bg-indigo-100 text-[#5145cd] p-2 rounded-lg flex-shrink-0">
+                  <ClipboardList className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900">Format Tabel Vertikal (Rekomendasi)</h4>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                    Setiap jawaban peserta dijabarkan ke bawah (baris baru). Sangat rapi, tidak memanjang ke samping, dan mudah difilter/dianalisis di Excel.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  downloadDetailCSV('horizontal');
+                  setShowCsvModal(false);
+                }}
+                className="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-[#5145cd] hover:bg-indigo-50/30 transition-all flex items-start gap-3"
+              >
+                <div className="mt-0.5 bg-slate-100 text-slate-600 p-2 rounded-lg flex-shrink-0">
+                  <Download className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900">Format Tabel Horizontal</h4>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                    Satu baris mewakili satu peserta, dengan kolom detail pertanyaan memanjang ke samping kanan.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-gray-100">
+              <button
+                onClick={() => setShowCsvModal(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase tracking-wider rounded-xl transition-all"
+              >
+                Batal
               </button>
             </div>
           </div>
@@ -1278,7 +1467,7 @@ export default function LiveLeaderboard() {
               <Download className="w-4 h-4 mr-2 text-indigo-500" /> Rekap Skor
             </button>
             <button
-              onClick={downloadDetailCSV}
+              onClick={() => setShowCsvModal(true)}
               disabled={isExporting}
               className="flex items-center px-4 py-2.5 bg-[#5145cd] hover:bg-[#3d32a8] border border-transparent text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md shadow-indigo-200 transition-all disabled:opacity-60"
             >
