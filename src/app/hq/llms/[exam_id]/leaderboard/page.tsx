@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { generateTicketCode } from '@/lib/utils';
 import { 
   ArrowLeft, 
   Trophy, 
@@ -37,6 +38,7 @@ export default function LiveLeaderboard() {
   const examId = params.exam_id as string;
 
   const [attempts, setAttempts] = useState<any[]>([]);
+  const [participantMap, setParticipantMap] = useState<Record<string, any>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [topScore, setTopScore] = useState(0);
@@ -144,16 +146,51 @@ export default function LiveLeaderboard() {
   };
 
   const fetchLeaderboardData = async () => {
-    const [attemptsRes, questionsRes, examRes] = await Promise.all([
+    const [attemptsRes, questionsRes, examRes, entriesRes] = await Promise.all([
       supabase.from('cbt_attempts').select('*').eq('exam_id', examId),
       supabase.from('cbt_questions').select('*').eq('exam_id', examId).order('created_at', { ascending: true }),
-      supabase.from('cbt_exams').select('*').eq('id', examId).maybeSingle()
+      supabase.from('cbt_exams').select('*').eq('id', examId).maybeSingle(),
+      supabase.from('competition_entries').select('id, full_name, email, nisn, school_name, school, province, city, notes, category, competition_type, team_name, mentor_name, whatsapp, phone')
     ]);
 
     if (attemptsRes.error) { console.error('Gagal:', attemptsRes.error); return; }
     const qList = questionsRes.data || [];
     setAllQuestions(qList);
     if (examRes.data) setExamConfig(examRes.data);
+
+    if (entriesRes.data) {
+      const pMap: Record<string, any> = {};
+      entriesRes.data.forEach((entry: any) => {
+        let ticketCode = "";
+        if (entry.notes) {
+          try {
+            const notesObj = JSON.parse(entry.notes);
+            if (notesObj.custom_ticket_id) {
+              ticketCode = notesObj.custom_ticket_id.toUpperCase();
+            }
+          } catch (e) {}
+        }
+        if (!ticketCode) {
+          ticketCode = `NCC-${generateTicketCode(entry.id)}`;
+        }
+        const cleanCode = ticketCode.toUpperCase();
+        pMap[cleanCode] = {
+          full_name: entry.full_name,
+          school_name: entry.school_name || entry.school || "",
+          email: entry.email,
+          nisn: entry.nisn,
+          province: entry.province,
+          city: entry.city,
+          category: entry.category,
+          competition_type: entry.competition_type,
+          team_name: entry.team_name,
+          mentor_name: entry.mentor_name,
+          whatsapp: entry.whatsapp || entry.phone || "",
+        };
+      });
+      setParticipantMap(pMap);
+    }
+
     if (attemptsRes.data) prosesDanUrutkanData(attemptsRes.data, qList);
     setLoading(false);
   };
@@ -373,7 +410,13 @@ export default function LiveLeaderboard() {
 
   const filteredAttempts = attempts.filter((item) => {
     const uid = item.user_id ? String(item.user_id).toLowerCase() : '';
-    return uid.includes(searchQuery.toLowerCase());
+    const codeKey = uid.toUpperCase();
+    const cleanCodeKey = codeKey.replace("NCC-", "");
+    const info = participantMap[codeKey] || participantMap[cleanCodeKey] || { full_name: "", school_name: "" };
+    const query = searchQuery.toLowerCase();
+    return uid.includes(query) || 
+           String(info.full_name || '').toLowerCase().includes(query) || 
+           String(info.school_name || '').toLowerCase().includes(query);
   });
 
   const downloadCSV = () => {
@@ -1252,7 +1295,7 @@ export default function LiveLeaderboard() {
             <Search className="w-4 h-4 text-gray-400 absolute left-10" />
             <input
               type="text"
-              placeholder="Cari berdasarkan ID Peserta..."
+              placeholder="Cari berdasarkan ID, nama, atau asal sekolah..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-white pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 outline-none text-sm text-gray-700 focus:ring-2 focus:ring-[#5145cd]/20 focus:border-[#5145cd] transition-all shadow-sm"
@@ -1301,16 +1344,98 @@ export default function LiveLeaderboard() {
                           </span>
                         </td>
 
-                        {/* ID */}
-                        <td className="py-4 px-6 font-semibold text-gray-800">
-                          {item.user_id}
-                          {isDone && (
-                            checkHasUngradedEssay(item) ? (
-                              <span className="ml-2 bg-amber-100 text-amber-700 font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-wider animate-pulse border border-amber-200">Dalam Review</span>
-                            ) : (
-                              <span className="ml-2 bg-emerald-100 text-emerald-700 font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-wider">Selesai</span>
-                            )
-                          )}
+                        {/* ID & BIODATA PESERTA */}
+                        <td className="py-4 px-6">
+                          {(() => {
+                            const codeKey = String(item.user_id || '').toUpperCase();
+                            const cleanCodeKey = codeKey.replace("NCC-", "");
+                            const info = participantMap[codeKey] || participantMap[cleanCodeKey] || {
+                              full_name: "Peserta Anonim",
+                              school_name: "Asal Sekolah Tidak Diketahui",
+                              email: "",
+                              nisn: "",
+                              province: "",
+                              city: "",
+                              category: "",
+                              competition_type: "",
+                              team_name: "",
+                              mentor_name: "",
+                              whatsapp: ""
+                            };
+                            return (
+                              <div className="flex flex-col gap-1 text-left">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-extrabold text-slate-800 text-sm hover:text-[#5145cd] transition-colors">
+                                    {info.full_name || "Peserta Anonim"}
+                                  </span>
+                                  {isDone && (
+                                    checkHasUngradedEssay(item) ? (
+                                      <span className="bg-amber-100 text-amber-700 font-black text-[8px] px-2 py-0.5 rounded uppercase tracking-wider animate-pulse border border-amber-200">Dalam Review</span>
+                                    ) : (
+                                      <span className="bg-emerald-100 text-emerald-700 font-black text-[8px] px-2 py-0.5 rounded uppercase tracking-wider border border-emerald-250/30">Selesai</span>
+                                    )
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+                                  <span className="font-mono bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-[9px] text-slate-650 font-black">
+                                    {item.user_id}
+                                  </span>
+                                  {info.school_name && (
+                                    <>
+                                      <span className="text-slate-300">•</span>
+                                      <span className="text-slate-500 font-semibold truncate max-w-[150px]">{info.school_name}</span>
+                                    </>
+                                  )}
+                                  
+                                  {/* Info Tooltip Biodata Lengkap */}
+                                  <div className="relative group/bio ml-1">
+                                    <button className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer">
+                                      <Info className="w-3.5 h-3.5" />
+                                    </button>
+                                    
+                                    <div className="absolute left-0 bottom-full mb-2 hidden group-hover/bio:block bg-slate-900/95 backdrop-blur-md text-white text-[11px] rounded-2xl p-4 shadow-2xl z-50 border border-slate-800 w-72 pointer-events-none transition-all duration-300">
+                                      <h4 className="font-black text-[9px] text-indigo-300 uppercase tracking-widest mb-2.5 border-b border-white/10 pb-1.5">Biodata Lengkap Peserta</h4>
+                                      <div className="space-y-2 text-left font-sans">
+                                        <div className="grid grid-cols-3 gap-1">
+                                          <span className="text-slate-400 font-bold">Email:</span>
+                                          <span className="col-span-2 font-black truncate">{info.email || '-'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1">
+                                          <span className="text-slate-400 font-bold">NISN:</span>
+                                          <span className="col-span-2 font-black">{info.nisn || '-'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1">
+                                          <span className="text-slate-400 font-bold">Wilayah:</span>
+                                          <span className="col-span-2 font-black truncate">{[info.city, info.province].filter(Boolean).join(', ') || '-'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1">
+                                          <span className="text-slate-400 font-bold">WhatsApp:</span>
+                                          <span className="col-span-2 font-black font-mono">{info.whatsapp || '-'}</span>
+                                        </div>
+                                        {info.team_name && (
+                                          <div className="grid grid-cols-3 gap-1">
+                                            <span className="text-slate-400 font-bold">Nama Tim:</span>
+                                            <span className="col-span-2 font-black text-amber-300 truncate">{info.team_name}</span>
+                                          </div>
+                                        )}
+                                        {info.mentor_name && (
+                                          <div className="grid grid-cols-3 gap-1">
+                                            <span className="text-slate-400 font-bold">Pembina:</span>
+                                            <span className="col-span-2 font-black truncate">{info.mentor_name.split(' | ')[0]}</span>
+                                          </div>
+                                        )}
+                                        <div className="grid grid-cols-3 gap-1">
+                                          <span className="text-slate-400 font-bold">Lomba:</span>
+                                          <span className="col-span-2 font-black text-indigo-300 truncate">{info.competition_type || info.category || '-'}</span>
+                                        </div>
+                                      </div>
+                                      <div className="absolute top-full left-3.5 border-4 border-transparent border-t-slate-900"></div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         {/* SKOR */}
