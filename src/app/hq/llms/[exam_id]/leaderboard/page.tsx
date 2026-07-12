@@ -239,7 +239,8 @@ export default function LiveLeaderboard() {
     const { data: qData } = await supabase
       .from('cbt_questions')
       .select('*')
-      .eq('exam_id', examId);
+      .eq('exam_id', examId)
+      .order('created_at', { ascending: true });
 
     if (qData) setReviewQuestions(qData);
     setActiveReviewIndex(0);
