@@ -446,7 +446,7 @@ export default function LiveLeaderboard() {
 
       // Build header dynamically: basic info + per-question details (grouped for readability)
       const headers = [
-        '"Peringkat"', '"ID Peserta"', '"Skor Total"', '"Jumlah Benar"', '"Jumlah Salah"', '"Jumlah Kosong"',
+        '"Peringkat"', '"ID Peserta"', '"Nama Peserta"', '"Asal Sekolah"', '"Skor Total"', '"Jumlah Benar"', '"Jumlah Salah"', '"Jumlah Kosong"',
         '"Pelanggaran"', '"Status Submit"', '"Terakhir Update"'
       ];
       questions.forEach((q, i) => {
@@ -470,10 +470,23 @@ export default function LiveLeaderboard() {
           // 1. Pertanyaan
           const cleanQText = `"${String(q.question_text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
 
-          // 4. Jawaban Peserta
-          const cleanUserAns = userAns 
-            ? `"${String(userAns).replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`
-            : '"(kosong)"';
+          // 4. Jawaban Peserta (Spill Pilihan Ganda if qType is pg/standard MC)
+          let cleanUserAns = '"(kosong)"';
+          if (userAns) {
+            if (qType === 'essay' || qType === 'isian') {
+              cleanUserAns = `"${String(userAns).replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+            } else {
+              // Pilihan Ganda (PG) - Spill the answer option text
+              const selectedLetters = String(userAns).split('');
+              const spilledOptions = selectedLetters.map(letter => {
+                const upperL = letter.toUpperCase();
+                const optionText = q.options?.[upperL] || q.options?.[letter.toLowerCase()] || '';
+                return optionText ? `${upperL} (${optionText})` : upperL;
+              });
+              const combinedText = spilledOptions.join(' | ');
+              cleanUserAns = `"${combinedText.replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+            }
+          }
 
           // 5. Status & 6. Poin
           let statusText = '';
@@ -543,9 +556,15 @@ export default function LiveLeaderboard() {
           qCols.push(String(pointEarned));
         });
 
+        const codeKey = String(item.user_id || '').toUpperCase();
+        const cleanCodeKey = codeKey.replace("NCC-", "");
+        const info = participantMap[codeKey] || participantMap[cleanCodeKey] || { full_name: "Peserta Anonim", school_name: "Asal Sekolah Tidak Diketahui" };
+
         const rowMeta = [
           realRank,
           `"${item.user_id}"`,
+          `"${(info.full_name || '').replace(/"/g, '""')}"`,
+          `"${(info.school_name || '').replace(/"/g, '""')}"`,
           checkHasUngradedEssay(item, questions) ? '"Ditinjau"' : (item.score ?? 0),
           benar,
           salah,
