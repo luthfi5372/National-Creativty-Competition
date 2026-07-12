@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { generateTicketCode } from '@/lib/utils';
+import { getAdminCompetitionEntries } from '@/app/actions/auth';
 import { 
   ArrowLeft, 
   Trophy, 
@@ -150,7 +151,7 @@ export default function LiveLeaderboard() {
       supabase.from('cbt_attempts').select('*').eq('exam_id', examId),
       supabase.from('cbt_questions').select('*').eq('exam_id', examId).order('created_at', { ascending: true }),
       supabase.from('cbt_exams').select('*').eq('id', examId).maybeSingle(),
-      supabase.from('competition_entries').select('id, full_name, email, nisn, school_name, school, province, city, notes, category, competition_type, team_name, mentor_name, whatsapp, phone')
+      getAdminCompetitionEntries()
     ]);
 
     if (attemptsRes.error) { console.error('Gagal:', attemptsRes.error); return; }
@@ -158,7 +159,7 @@ export default function LiveLeaderboard() {
     setAllQuestions(qList);
     if (examRes.data) setExamConfig(examRes.data);
 
-    if (entriesRes.data) {
+    if (entriesRes && entriesRes.data) {
       const pMap: Record<string, any> = {};
       entriesRes.data.forEach((entry: any) => {
         let ticketCode = "";
@@ -185,7 +186,7 @@ export default function LiveLeaderboard() {
           competition_type: entry.competition_type,
           team_name: entry.team_name,
           mentor_name: entry.mentor_name,
-          whatsapp: entry.whatsapp || entry.phone || "",
+          whatsapp: entry.whatsapp_number || entry.phone || "",
         };
       });
       setParticipantMap(pMap);
