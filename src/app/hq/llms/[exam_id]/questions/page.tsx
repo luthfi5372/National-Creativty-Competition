@@ -481,6 +481,8 @@ export default function EditorBankSoal() {
             calculatedWeight = 10;
           }
 
+          // Gunakan offset milidetik agar order created_at stabil saat batch insert
+          const qCreatedAt = new Date(Date.now() + i);
           dataInsert.push({
             exam_id: examId,
             question_text: soalText,
@@ -488,8 +490,8 @@ export default function EditorBankSoal() {
             correct_answer: validKunci,
             difficulty,
             weight: calculatedWeight,
-
-            status: 'Published'
+            status: 'Published',
+            created_at: qCreatedAt.toISOString()
           });
         }
 
