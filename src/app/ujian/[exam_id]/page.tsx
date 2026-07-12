@@ -43,6 +43,7 @@ export default function ExamRoom() {
   const [violationCount, setViolationCount] = useState(0);
   const [isBlocked, setIsBlocked] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
+  const [isForceSubmitted, setIsForceSubmitted] = useState(false);
 
   useEffect(() => {
     // 🔥 PENCEGAHAN ERROR: Jangan jalankan query jika ID ujian masih "undefined"
@@ -154,6 +155,42 @@ export default function ExamRoom() {
     const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     return () => clearInterval(timer);
   }, [loading, timeLeft, isBlocked]);
+
+  // 📡 REALTIME SUBSCRIPTION FOR FORCE SUBMIT
+  useEffect(() => {
+    if (!student || !examId || isFinished) return;
+
+    const userId = student.ticket_code || (student.id ? `NCC-${generateTicketCode(student.id)}` : (student.nisn || student.username));
+
+    const channel = supabase
+      .channel(`cbt_attempts_force_${userId}_${examId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'cbt_attempts',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload: any) => {
+          if (payload.new && payload.new.exam_id === examId && payload.new.submitted_at && !isFinished) {
+            console.log("[CBT REALTIME] Force submit detected!");
+            setIsForceSubmitted(true);
+            setIsFinished(true); // Stop timers, block keyboard
+            localStorage.setItem(`cbt_submitted_${examId}`, 'true');
+            
+            setTimeout(() => {
+              router.replace('/ujian/dashboard?status=force_submitted');
+            }, 6000);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [student, examId, isFinished, router, supabase]);
 
   // 🔥 RADAR SENSITIVITAS TINGGI
   useEffect(() => {
@@ -425,14 +462,22 @@ export default function ExamRoom() {
       )}
 
       {isFinished && (
-        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#5145cd] text-white p-4 animate-in fade-in zoom-in duration-500">
-          <CheckCircleIcon className="w-24 h-24 mb-6 text-emerald-300 animate-bounce" />
-          <h1 className="text-4xl font-black tracking-tight mb-2 text-center">Ujian Selesai!</h1>
+        <div className={`fixed inset-0 z-[200] flex flex-col items-center justify-center p-4 animate-in fade-in zoom-in duration-500 ${isForceSubmitted ? 'bg-gradient-to-br from-amber-950 via-slate-900 to-indigo-950 text-white' : 'bg-[#5145cd] text-white'}`}>
+          {isForceSubmitted ? (
+            <ExclamationTriangleIcon className="w-24 h-24 mb-6 text-amber-500 animate-bounce" />
+          ) : (
+            <CheckCircleIcon className="w-24 h-24 mb-6 text-emerald-300 animate-bounce" />
+          )}
+          <h1 className="text-4xl font-black tracking-tight mb-2 text-center">
+            {isForceSubmitted ? 'Ujian Selesai! (Dikumpulkan Paksa)' : 'Ujian Selesai!'}
+          </h1>
           <p className="text-sm font-bold text-indigo-200 text-center max-w-md leading-relaxed mb-8">
-            Terima kasih telah berpartisipasi dengan jujur. Jawaban Anda telah dienkripsi dan diamankan di pangkalan data kami.
+            {isForceSubmitted 
+              ? 'Lembar jawaban Anda telah dikumpulkan secara paksa oleh Pengawas/Admin. Sistem sedang memfinalisasi penyimpanan jawaban Anda.' 
+              : 'Terima kasih telah berpartisipasi dengan jujur. Jawaban Anda telah dienkripsi dan diamankan di pangkalan data kami.'}
           </p>
           <div className="w-48 h-2 bg-indigo-900 rounded-full overflow-hidden">
-            <div className="h-full bg-emerald-400 rounded-full animate-[progress_4s_ease-in-out_forwards]" style={{ width: '100%', animationName: 'progress-bar' }}>
+            <div className="h-full bg-emerald-400 rounded-full animate-[progress_6s_ease-in-out_forwards]" style={{ width: '100%', animationName: 'progress-bar', animationDuration: isForceSubmitted ? '6s' : '4s' }}>
               <style>{`
                 @keyframes progress-bar {
                   0% { width: 0%; }
