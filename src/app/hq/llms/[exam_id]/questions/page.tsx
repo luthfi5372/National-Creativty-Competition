@@ -154,23 +154,32 @@ export default function EditorBankSoal() {
 
   // 🚀 3. FUNGSI UTAMA: SIMPAN (CREATE / UPDATE) DATA SOAL
   const handleSimpanSoal = async () => {
-    if (!soal && !imageFile) return alert("Konten soal teks atau gambar wajib ada!");
+    if (!soal && !imageFile) {
+      showToast("Konten soal teks atau gambar wajib ada!", "error");
+      return;
+    }
     
     if (questionType === 'pg') {
-      if (!opsi.A || !opsi.B) return alert("Opsi jawaban A dan B minimal harus diisi!");
+      if (!opsi.A || !opsi.B) {
+        showToast("Opsi jawaban A dan B minimal harus diisi!", "error");
+        return;
+      }
       // Validasi: pastikan opsi yang dipilih sebagai kunci jawaban tidak kosong
       const correctLetters = (kunciJawaban || '').split('');
       if (correctLetters.length === 0) {
-        return alert("Pilih minimal satu kunci jawaban!");
+        showToast("Pilih minimal satu kunci jawaban!", "error");
+        return;
       }
       for (const letter of correctLetters) {
         if (!opsi[letter]) {
-          return alert(`Opsi ${letter} yang dipilih sebagai kunci jawaban masih kosong! Isi terlebih dahulu teks untuk opsi ${letter}.`);
+          showToast(`Opsi ${letter} yang dipilih sebagai kunci jawaban masih kosong! Isi terlebih dahulu teks untuk opsi ${letter}.`, "error");
+          return;
         }
       }
     } else if (questionType === 'isian') {
       if (!shortAnswerKey.trim()) {
-        return alert("Kunci jawaban isian singkat wajib diisi!");
+        showToast("Kunci jawaban isian singkat wajib diisi!", "error");
+        return;
       }
     }
 
@@ -523,7 +532,7 @@ export default function EditorBankSoal() {
   };
 
   const handleHapusSoal = async (id: string) => {
-    if (!confirm("Hapus permanen soal ini dari sistem?")) return;
+    if (!window.confirm("Hapus permanen soal ini dari sistem?")) return;
     await supabase.from('cbt_questions').delete().eq('id', id);
     fetchSoalTersimpan();
     showToast("Soal berhasil dihapus!", "success");
@@ -1001,7 +1010,7 @@ export default function EditorBankSoal() {
                         />
                         
                         {qType === 'pg' && (
-                          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs text-gray-600">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-xs text-gray-600">
                             {Object.keys(item.options || {})
                               .filter(key => key.length === 1 && key >= 'A' && key <= 'Z')
                               .sort()
@@ -1010,15 +1019,16 @@ export default function EditorBankSoal() {
                                 const isCorrect = String(item.correct_answer || '').toUpperCase().includes(opt);
                                 if (!val) return null;
                                 return (
-                                  <div key={opt} className={`p-2 rounded border ${isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-gray-50 border-gray-100'}`}>
-                                    <div className="flex justify-between items-start">
-                                      <span>{opt}. <span dangerouslySetInnerHTML={{ __html: renderMath(val) }} /></span>
-                                      {item.options?.points?.[opt] !== undefined && item.options.points[opt] !== 0 && (
-                                        <span className="text-[9px] text-indigo-500 font-bold bg-indigo-50 px-1 py-0.5 rounded shrink-0 ml-1">
-                                          {item.options.points[opt]}p
-                                        </span>
-                                      )}
+                                  <div key={opt} className={`p-3.5 rounded-xl border-2 transition-all flex justify-between items-center ${isCorrect ? 'bg-emerald-50/50 border-emerald-200 text-emerald-950 font-bold' : 'bg-slate-50/50 border-slate-100'}`}>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>{opt}</span>
+                                      <span className="truncate" dangerouslySetInnerHTML={{ __html: renderMath(val) }} />
                                     </div>
+                                    {item.options?.points?.[opt] !== undefined && item.options.points[opt] !== 0 && (
+                                      <span className="text-[9px] text-indigo-600 font-black bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-lg shrink-0 ml-2">
+                                        +{item.options.points[opt]} Poin
+                                      </span>
+                                    )}
                                   </div>
                                 )
                               })}
