@@ -6967,23 +6967,23 @@ function ModernHQDashboardContent() {
             <X size={18} />
           </button>
 
-          <div className="w-16 h-16 bg-indigo-50 text-indigo-650 rounded-[1.25rem] flex items-center justify-center mb-5 shadow-inner border border-indigo-100/50">
+          <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white rounded-[1.25rem] flex items-center justify-center mb-5 shadow-lg shadow-indigo-100 border border-indigo-200/20">
             <Pencil size={24} />
           </div>
 
           <h3 className="text-xl font-black text-slate-800 mb-1 tracking-tight">Kustom ID Tiket</h3>
           <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-6">
-            Peserta: <span className="text-slate-650 normal-case font-extrabold">{ticketModal.entry?.full_name || "Peserta Anonim"}</span>
+            Peserta: <span className="text-indigo-600 normal-case font-black">{ticketModal.entry?.full_name || "Peserta Anonim"}</span>
           </p>
 
           <div className="space-y-4 mb-6">
             {/* Info Status Saat Ini */}
-            <div className="bg-slate-50 border border-slate-150/50 p-4 rounded-2xl flex items-center justify-between">
+            <div className="bg-gradient-to-r from-slate-50 to-indigo-50/30 border border-slate-200/80 p-4 rounded-2xl flex items-center justify-between">
               <div>
                 <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">ID Tiket Aktif</p>
                 <p className="text-sm font-black text-slate-700 mt-0.5">{ticketModal.currentTicketCode}</p>
               </div>
-              <span className="px-2 py-0.5 text-[9px] font-bold text-slate-500 bg-slate-200/60 rounded">
+              <span className="px-2.5 py-0.5 text-[9px] font-black text-indigo-700 bg-indigo-100 rounded-md uppercase tracking-wider">
                 NCC Default
               </span>
             </div>
@@ -6997,9 +6997,9 @@ function ModernHQDashboardContent() {
                   value={ticketModal.customTicketId}
                   onChange={(e) => setTicketModal(prev => ({ ...prev, customTicketId: e.target.value }))}
                   placeholder="Contoh: 222SYB"
-                  className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl px-4.5 py-3.5 pr-20 text-sm font-extrabold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-150 transition-all uppercase tracking-wider"
+                  className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl px-4.5 py-3.5 pr-24 text-sm font-extrabold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-150 transition-all uppercase tracking-wider"
                 />
-                <span className="absolute right-4.5 top-1/2 -translate-y-1/2 text-[10px] font-black text-indigo-650 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1">
+                <span className="absolute right-4.5 top-1/2 -translate-y-1/2 text-[9px] font-black text-white bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg px-2 py-1 tracking-wider uppercase">
                   KUSTOM
                 </span>
               </div>
@@ -7010,9 +7010,11 @@ function ModernHQDashboardContent() {
 
             {/* Live Preview Card */}
             {ticketModal.customTicketId.trim() && (
-              <div className="bg-indigo-50/40 border border-indigo-100/50 p-4 rounded-2xl">
-                <p className="text-[9px] text-indigo-500 font-black uppercase tracking-wider mb-1">Pratinjau Kode Akhir</p>
-                <span className="text-base font-black text-indigo-750 tracking-wider">
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 p-4 rounded-2xl shadow-sm transition-all duration-300">
+                <p className="text-[9px] text-emerald-600 font-black uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <Sparkles size={10} className="animate-spin text-emerald-500" /> Pratinjau Kode Akhir
+                </p>
+                <span className="text-base font-black text-emerald-800 tracking-wider">
                   NCC-{ticketModal.customTicketId.trim().toUpperCase()}
                 </span>
               </div>
@@ -7022,13 +7024,13 @@ function ModernHQDashboardContent() {
           <div className="flex gap-4">
             <button 
               onClick={() => setTicketModal(prev => ({ ...prev, show: false }))} 
-              className="flex-1 py-3.5 rounded-2xl font-bold text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 active:scale-95 transition-all text-sm"
+              className="flex-1 py-3.5 rounded-2xl font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 transition-all text-sm"
             >
               Batalkan
             </button>
             <button 
               onClick={handleSaveCustomTicket}
-              className="flex-1 py-3.5 rounded-2xl font-bold text-white bg-indigo-650 hover:bg-indigo-700 shadow-lg shadow-indigo-100 active:scale-95 transition-all text-sm"
+              className="flex-1 py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg shadow-indigo-200/50 hover:shadow-indigo-300/40 active:scale-95 transition-all text-sm"
             >
               Simpan Kode
             </button>
