@@ -345,9 +345,13 @@ export default function StudentDashboard() {
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</span>
                 <span className={`font-black px-3 py-1 rounded-full text-[10px] flex items-center uppercase tracking-wider
-                  ${statusPassing === 'PASSED' ? 'text-emerald-600 bg-emerald-50' : statusPassing === 'FAILED' ? 'text-rose-600 bg-rose-50' : 'text-amber-600 bg-amber-50'}`}>
+                  ${statusPassing === 'PASSED' ? 'text-emerald-600 bg-emerald-50 border border-emerald-100' : 
+                    statusPassing === 'FAILED' ? 'text-rose-600 bg-rose-50 border border-rose-100' : 
+                    isDone ? 'text-emerald-600 bg-emerald-50 border border-emerald-100' : 'text-amber-600 bg-amber-50 border border-amber-100'}`}>
                   <ShieldCheckIcon className="w-3.5 h-3.5 mr-1" />
-                  {statusPassing === 'PASSED' ? 'LOLOS' : statusPassing === 'FAILED' ? 'TIDAK LOLOS' : 'Menunggu'}
+                  {statusPassing === 'PASSED' ? 'LOLOS' : 
+                    statusPassing === 'FAILED' ? 'TIDAK LOLOS' : 
+                    isDone ? 'SELESAI' : 'Menunggu'}
                 </span>
               </div>
             </div>
