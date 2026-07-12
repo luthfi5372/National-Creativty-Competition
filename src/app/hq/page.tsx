@@ -863,7 +863,8 @@ function ModernHQDashboardContent() {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
-  const [activeCsvTab, setActiveCsvTab] = useState<'upload' | 'guide'>('upload');
+  const [activeCsvTab, setActiveCsvTab] = useState<'upload' | 'guide' | 'custom'>('upload');
+  const [useCustomTicketId, setUseCustomTicketId] = useState(false);
   
   const [timelineData, setTimelineData] = useState<any[]>([
     {
@@ -2645,20 +2646,28 @@ function ModernHQDashboardContent() {
 
   const handleDownloadTemplate = () => {
     const firstCatName = categories[0]?.name || "LKTI Nasional";
-    const templateData = [
-      ["nama_lengkap", "email", "nisn", "npsn", "asal_sekolah", "provinsi", "kota", "kategori_lomba", "nama_pembina", "email_pembina", "no_wa"],
-      ["Budi Santoso", "budi@gmail.com", "12345678", "20101234", "SMA Negeri 1 Jakarta", "DKI Jakarta", "Jakarta Selatan", firstCatName, "Pak Guru", "guru@sekolah.sch.id", "08123456789"]
-    ];
+
+    // Jika mode Custom ID Tiket aktif → sertakan kolom id_tiket
+    const headers = useCustomTicketId
+      ? ["id_tiket", "nama_lengkap", "email", "nisn", "npsn", "asal_sekolah", "provinsi", "kota", "kategori_lomba", "nama_pembina", "email_pembina", "no_wa"]
+      : ["nama_lengkap", "email", "nisn", "npsn", "asal_sekolah", "provinsi", "kota", "kategori_lomba", "nama_pembina", "email_pembina", "no_wa"];
+
+    const example = useCustomTicketId
+      ? ["NCC-UJIAN01", "Budi Santoso", "budi@gmail.com", "12345678", "20101234", "SMA Negeri 1 Jakarta", "DKI Jakarta", "Jakarta Selatan", firstCatName, "Pak Guru", "guru@sekolah.sch.id", "08123456789"]
+      : ["Budi Santoso", "budi@gmail.com", "12345678", "20101234", "SMA Negeri 1 Jakarta", "DKI Jakarta", "Jakarta Selatan", firstCatName, "Pak Guru", "guru@sekolah.sch.id", "08123456789"];
+
+    const templateData = [headers, example];
     const csv = Papa.unparse(templateData);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", "template_data_peserta_ncc.csv");
+    link.setAttribute("download", useCustomTicketId ? "template_peserta_custom_id_ncc.csv" : "template_data_peserta_ncc.csv");
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    showToast(`Template ${useCustomTicketId ? 'dengan kolom ID Tiket Kustom' : 'standar'} berhasil diunduh!`, "success");
   };
 
   const handleImportCSV = () => {
@@ -2674,39 +2683,69 @@ function ModernHQDashboardContent() {
           if (!rows || rows.length === 0) {
             throw new Error("File CSV kosong atau tidak valid");
           }
+
+          // Validasi kolom id_tiket jika mode custom aktif
+          if (useCustomTicketId) {
+            const firstRow = rows[0] as any;
+            const hasIdTiket = 'id_tiket' in firstRow || 'ID_TIKET' in firstRow || 'Id_Tiket' in firstRow;
+            if (!hasIdTiket) {
+              throw new Error("Mode ID Tiket Kustom aktif, tetapi kolom 'id_tiket' tidak ditemukan di CSV. Pastikan kolom tersebut ada atau matikan mode Custom ID.");
+            }
+
+            // Cek duplikasi ID dalam CSV yang diupload
+            const uploadedIds = rows.map((r: any) => (
+              (r.id_tiket || r.ID_TIKET || r.Id_Tiket || "").toString().trim().toUpperCase()
+            )).filter(id => id);
+            const uniqueIds = new Set(uploadedIds);
+            if (uniqueIds.size !== uploadedIds.length) {
+              throw new Error("Ditemukan ID Tiket yang duplikat di dalam file CSV. Setiap baris harus memiliki ID Tiket yang unik.");
+            }
+          }
           
-          const activeWave = waves.find(w => w.status === 'Aktif');
+          const activeWave = waves.find((w: any) => w.status === 'Aktif');
           const notesObj: any = {};
           if (activeWave) {
             notesObj.registered_wave = activeWave.name;
           }
-          const notesString = Object.keys(notesObj).length > 0 ? JSON.stringify(notesObj) : null;
 
-          const insertArray = rows.map((row) => ({
-            user_id: null,
-            full_name: row.nama_lengkap || row.Nama_Lengkap || row.NAMA_LENGKAP || "-",
-            email: row.email || row.Email || row.EMAIL || "no-email@ncc.id",
-            nisn: row.nisn || row.NISN || row.Nisn || "-",
-            npsn: row.npsn || row.NPSN || row.Npsn || "-",
-            school_name: row.asal_sekolah || row.Asal_Sekolah || row.ASAL_SEKOLAH || "-",
-            province: row.provinsi || row.Provinsi || row.PROVINSI || "-",
-            city: row.kota || row.Kota || row.KOTA || "-",
-            competition_type: row.kategori_lomba || row.Kategori_Lomba || row.KATEGORI_LOMBA || "-",
-            mentor_name: [
-              row.nama_pembina || row.Nama_Pembina || row.NAMA_PEMBINA || "-",
-              row.email_pembina || row.Email_Pembina || row.EMAIL_PEMBINA || "",
-              row.no_wa || row.No_Wa || row.NO_WA || ""
-            ].filter(Boolean).join(" | ").replace(/ \| $/, "").replace(/^\|/, "").trim() || "-",
-            payment_status: 'Verified',
-            notes: notesString
-          }));
+          const insertArray = rows.map((row: any) => {
+            // Jika mode custom, simpan id_tiket ke dalam notes sebagai custom_ticket_id
+            const customTicketId = useCustomTicketId
+              ? (row.id_tiket || row.ID_TIKET || row.Id_Tiket || "").toString().trim().toUpperCase()
+              : null;
+
+            if (customTicketId) {
+              notesObj.custom_ticket_id = customTicketId;
+            }
+
+            return {
+              user_id: null,
+              full_name: row.nama_lengkap || row.Nama_Lengkap || row.NAMA_LENGKAP || "-",
+              email: row.email || row.Email || row.EMAIL || "no-email@ncc.id",
+              nisn: row.nisn || row.NISN || row.Nisn || "-",
+              npsn: row.npsn || row.NPSN || row.Npsn || "-",
+              school_name: row.asal_sekolah || row.Asal_Sekolah || row.ASAL_SEKOLAH || "-",
+              province: row.provinsi || row.Provinsi || row.PROVINSI || "-",
+              city: row.kota || row.Kota || row.KOTA || "-",
+              competition_type: row.kategori_lomba || row.Kategori_Lomba || row.KATEGORI_LOMBA || "-",
+              mentor_name: [
+                row.nama_pembina || row.Nama_Pembina || row.NAMA_PEMBINA || "-",
+                row.email_pembina || row.Email_Pembina || row.EMAIL_PEMBINA || "",
+                row.no_wa || row.No_Wa || row.NO_WA || ""
+              ].filter(Boolean).join(" | ").replace(/ \| $/, "").replace(/^\|/, "").trim() || "-",
+              payment_status: 'Verified',
+              notes: Object.keys(notesObj).length > 0 ? JSON.stringify({ ...notesObj }) : null
+            };
+          });
           
           const { error } = await supabase.from('competition_entries').insert(insertArray);
           if (error) throw error;
           
-          showToast(`Berhasil mengimpor ${insertArray.length} peserta!`, "success");
+          const modeLabel = useCustomTicketId ? " (dengan ID Tiket Kustom)" : "";
+          showToast(`Berhasil mengimpor ${insertArray.length} peserta${modeLabel}!`, "success");
           setShowImportModal(false);
           setCsvFile(null);
+          setUseCustomTicketId(false);
           
           // Refresh Data
           const { data } = await getAdminCompetitionEntries();
@@ -7011,29 +7050,40 @@ function ModernHQDashboardContent() {
           <div className="flex border-b border-slate-100 mb-6">
             <button
               onClick={() => setActiveCsvTab('upload')}
-              className={`flex-1 pb-3 text-sm font-bold text-center border-b-2 transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 pb-3 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
                 activeCsvTab === 'upload'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-slate-400 hover:text-slate-600'
               }`}
             >
-              <FileText size={16} /> Unggah Berkas CSV
+              <FileText size={14} /> Unggah CSV
             </button>
             <button
               onClick={() => setActiveCsvTab('guide')}
-              className={`flex-1 pb-3 text-sm font-bold text-center border-b-2 transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 pb-3 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
                 activeCsvTab === 'guide'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-slate-400 hover:text-slate-600'
               }`}
             >
-              <AlertCircle size={16} /> Panduan Format & Kolom
+              <AlertCircle size={14} /> Panduan Format
+            </button>
+            <button
+              onClick={() => setActiveCsvTab('custom')}
+              className={`flex-1 pb-3 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+                activeCsvTab === 'custom'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <Sparkles size={14} /> Kustom ID Tiket
             </button>
           </div>
           
           <div className="space-y-6">
             {activeCsvTab === 'upload' ? (
-              <div className="space-y-6">
+              <div className="space-y-5">
+                {/* Info banner */}
                 <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-5 flex items-start gap-4">
                   <div className="p-2 bg-blue-100 text-blue-600 rounded-xl shrink-0 mt-0.5">
                     <AlertCircle size={20} />
@@ -7041,14 +7091,64 @@ function ModernHQDashboardContent() {
                   <div>
                     <h4 className="font-bold text-blue-800 text-sm">Siap untuk Mengunggah?</h4>
                     <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                      Pastikan format kolom berkas CSV Anda sudah sesuai dengan panduan. Jika belum yakin, Anda dapat melihat panduan kolom lengkap di tab sebelah atau mengunduh template resmi di bawah ini.
+                      Pastikan format kolom berkas CSV Anda sudah sesuai dengan panduan. Jika belum yakin, lihat tab <span className="font-bold text-blue-700">Panduan Format</span> atau tab <span className="font-bold text-indigo-700">Kustom ID Tiket</span> untuk penjelasan lengkap.
                     </p>
                     <button onClick={handleDownloadTemplate} className="mt-3 flex items-center gap-2 bg-white text-blue-600 hover:bg-blue-50 px-3.5 py-1.5 rounded-xl text-xs font-bold border border-blue-200 transition-colors shadow-sm">
-                      <Download size={13} /> Download Template CSV
+                      <Download size={13} /> Download Template {useCustomTicketId ? '(+Kolom ID Kustom)' : 'CSV'}
                     </button>
                   </div>
                 </div>
-                
+
+                {/* Toggle Custom Ticket ID */}
+                <div className={`rounded-2xl border-2 p-4 transition-all duration-200 ${
+                  useCustomTicketId
+                    ? 'bg-indigo-50/70 border-indigo-300'
+                    : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Sparkles size={15} className={useCustomTicketId ? 'text-indigo-600' : 'text-slate-400'} />
+                        <span className={`text-sm font-black ${
+                          useCustomTicketId ? 'text-indigo-800' : 'text-slate-600'
+                        }`}>Gunakan ID Tiket Kustom</span>
+                        {useCustomTicketId && (
+                          <span className="text-[9px] font-black bg-indigo-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">AKTIF</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        {useCustomTicketId
+                          ? <span className="text-indigo-700 font-medium">✓ Mode kustom aktif. Kolom <code className="bg-indigo-100 px-1 rounded font-mono">id_tiket</code> wajib ada di CSV Anda. Download template sudah menyertakan kolom ini.</span>
+                          : <span>ID Tiket akan di-generate otomatis oleh sistem (<span className="font-mono font-bold text-slate-600">NCC-XXXXXX</span>). Aktifkan toggle ini jika Anda ingin menentukan ID sendiri.</span>
+                        }
+                      </p>
+                    </div>
+                    {/* Toggle Switch */}
+                    <button
+                      type="button"
+                      onClick={() => setUseCustomTicketId(prev => !prev)}
+                      className={`relative shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                        useCustomTicketId ? 'bg-indigo-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition-transform duration-200 ${
+                          useCustomTicketId ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  
+                  {/* Peringatan jika custom aktif */}
+                  {useCustomTicketId && (
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2">
+                      <AlertTriangle size={13} className="text-amber-600 mt-0.5 shrink-0" />
+                      <p className="text-[11px] text-amber-700 leading-relaxed font-medium">
+                        Pastikan setiap baris memiliki nilai unik di kolom <code className="bg-amber-100 px-1 rounded font-mono">id_tiket</code>. ID duplikat atau kolom kosong akan menyebabkan import gagal.
+                      </p>
+                    </div>
+                  )}
+                </div>
                 <div>
                   <label className="text-sm font-bold text-slate-700 mb-2 block">Unggah File CSV</label>
                   <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors relative overflow-hidden">
@@ -7069,11 +7169,23 @@ function ModernHQDashboardContent() {
                   </div>
                 </div>
 
-                <button disabled={isImporting || !csvFile} onClick={handleImportCSV} className={`w-full py-4 rounded-xl font-bold text-white transition-all shadow-md ${isImporting || !csvFile ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800 active:scale-95 shadow-slate-900/20'}`}>
-                  {isImporting ? "Memproses Import Data..." : "Jalankan Import CSV Sekarang"}
+                <button disabled={isImporting || !csvFile} onClick={handleImportCSV} className={`w-full py-4 rounded-xl font-bold text-white transition-all shadow-md ${
+                  isImporting || !csvFile
+                    ? 'bg-slate-400 cursor-not-allowed'
+                    : useCustomTicketId
+                      ? 'bg-indigo-700 hover:bg-indigo-800 active:scale-95 shadow-indigo-900/20'
+                      : 'bg-slate-900 hover:bg-slate-800 active:scale-95 shadow-slate-900/20'
+                }`}>
+                  {isImporting
+                    ? "Memproses Import Data..."
+                    : useCustomTicketId
+                      ? "Jalankan Import CSV (Mode ID Kustom)"
+                      : "Jalankan Import CSV Sekarang"
+                  }
                 </button>
               </div>
-            ) : (
+
+            ) : activeCsvTab === 'guide' ? (
               <div className="space-y-4">
                 <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl p-5 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
@@ -7165,12 +7277,88 @@ function ModernHQDashboardContent() {
                         <tr>
                           <td className="py-3 px-4 font-mono font-bold text-blue-600">no_wa</td>
                           <td className="py-3 px-4"><span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-50 text-rose-600 border border-rose-100">Wajib</span></td>
-                          <td className="py-3 px-4 text-slate-600">Nomor WhatsApp aktif peserta</td>
+                          <td className="py-3 px-4 text-slate-600">Nomor WhatsApp aktif peserta (Contoh: <code className="bg-slate-100 px-1 py-0.5 rounded">08123456789</code>)</td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
+
+                {/* Contoh CSV mode otomatis */}
+                <div className="rounded-2xl bg-slate-900 p-4 overflow-x-auto">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">📄 Contoh CSV — Mode Otomatis (Tanpa Custom ID)</p>
+                  <pre className="text-[11px] text-emerald-400 font-mono leading-relaxed">{`nama_lengkap,email,nisn,...\nBudi Santoso,budi@gmail.com,1234567890,...`}</pre>
                 </div>
+
+              </div>
+
+            ) : (
+              /* ===== TAB: KUSTOM ID TIKET ===== */
+              <div className="space-y-5">
+                <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white rounded-2xl p-5 shadow-md">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Sparkles size={20} className="text-yellow-300" />
+                    <h4 className="font-black text-base">Panduan ID Tiket Kustom</h4>
+                  </div>
+                  <p className="text-xs text-indigo-100 leading-relaxed">
+                    Fitur ini memungkinkan admin menentukan ID Tiket peserta secara manual melalui kolom <code className="bg-white/20 px-1.5 py-0.5 rounded font-mono">id_tiket</code> di CSV. Berguna untuk migrasi data sistem lama atau penomoran tiket khusus.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="border-2 border-slate-200 rounded-2xl p-4 bg-slate-50">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">🤖 Mode Otomatis (Default)</p>
+                    <ul className="space-y-1.5 text-[11px] text-slate-600">
+                      <li className="flex items-start gap-1.5"><CheckCircle size={11} className="text-emerald-500 mt-0.5 shrink-0" /> ID di-generate sistem otomatis</li>
+                      <li className="flex items-start gap-1.5"><CheckCircle size={11} className="text-emerald-500 mt-0.5 shrink-0" /> Format: <code className="font-mono bg-slate-200 px-1 rounded text-[10px]">NCC-A3X7Q2</code></li>
+                      <li className="flex items-start gap-1.5"><CheckCircle size={11} className="text-emerald-500 mt-0.5 shrink-0" /> Tidak perlu kolom id_tiket</li>
+                      <li className="flex items-start gap-1.5"><CheckCircle size={11} className="text-emerald-500 mt-0.5 shrink-0" /> Dijamin unik oleh sistem</li>
+                    </ul>
+                  </div>
+                  <div className="border-2 border-indigo-300 rounded-2xl p-4 bg-indigo-50/60">
+                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-wider mb-2">✏️ Mode Kustom (Toggle ON)</p>
+                    <ul className="space-y-1.5 text-[11px] text-indigo-700">
+                      <li className="flex items-start gap-1.5"><CheckCircle size={11} className="text-indigo-500 mt-0.5 shrink-0" /> Admin tentukan ID sendiri</li>
+                      <li className="flex items-start gap-1.5"><CheckCircle size={11} className="text-indigo-500 mt-0.5 shrink-0" /> Kolom id_tiket <strong>wajib</strong> ada</li>
+                      <li className="flex items-start gap-1.5"><CheckCircle size={11} className="text-indigo-500 mt-0.5 shrink-0" /> ID harus unik antar baris CSV</li>
+                      <li className="flex items-start gap-1.5"><CheckCircle size={11} className="text-indigo-500 mt-0.5 shrink-0" /> Cocok untuk migrasi data lama</li>
+                    </ul>
+                  </div>
+                </div>
+                <div className="border border-amber-200 bg-amber-50 rounded-2xl p-4">
+                  <p className="text-xs font-black text-amber-800 mb-3 flex items-center gap-2"><AlertTriangle size={14} /> Aturan Format Kolom id_tiket</p>
+                  <div className="space-y-1.5">
+                    {[
+                      { rule: "Wajib diisi di setiap baris — tidak boleh kosong", ok: true },
+                      { rule: "Hanya boleh: huruf (A-Z), angka (0-9), dan tanda hubung (-)", ok: true },
+                      { rule: "Disarankan awali dengan NCC- (cth: NCC-UJIAN01)", ok: true },
+                      { rule: "Maksimal 20 karakter per ID tiket", ok: true },
+                      { rule: "Setiap baris CSV harus memiliki ID yang berbeda (unik)", ok: true },
+                      { rule: "Spasi, @, #, & dan karakter khusus TIDAK diperbolehkan", ok: false },
+                      { rule: "ID duplikat → seluruh proses import GAGAL total", ok: false },
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className={`text-[11px] font-bold mt-0.5 shrink-0 ${item.ok ? 'text-emerald-600' : 'text-rose-600'}`}>{item.ok ? '✓' : '✗'}</span>
+                        <p className={`text-[11px] ${item.ok ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{item.rule}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-black text-slate-700">Contoh Format CSV Mode Kustom</p>
+                  <div className="rounded-2xl bg-slate-900 p-4 overflow-x-auto">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">✅ Format Benar — Kolom id_tiket Diisi</p>
+                    <pre className="text-[11px] text-emerald-400 font-mono leading-relaxed">{`id_tiket,nama_lengkap,email,nisn,npsn,...\nNCC-UJIAN01,Budi Santoso,budi@gmail.com,1234567890,...\nNCC-UJIAN02,Siti Rahayu,siti@gmail.com,9876543210,...`}</pre>
+                  </div>
+                  <div className="rounded-xl bg-rose-950 p-4 overflow-x-auto">
+                    <p className="text-[10px] font-black text-rose-400 uppercase tracking-wider mb-2">❌ Format Salah — Import Akan GAGAL</p>
+                    <pre className="text-[11px] text-rose-300 font-mono leading-relaxed">{`,Budi,...      ← id_tiket KOSONG\nNCC-UJIAN01,Siti,...  ← ID DUPLIKAT\nNCC UJIAN03,...       ← Ada SPASI`}</pre>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setActiveCsvTab('upload'); setUseCustomTicketId(true); }}
+                  className="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 shadow-md shadow-indigo-200"
+                >
+                  <Sparkles size={16} /> Aktifkan Mode Kustom & Pergi ke Tab Upload
+                </button>
               </div>
             )}
           </div>
