@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useParams } from 'next/navigation';
+import { generateTicketCode } from "@/lib/utils";
 import Link from 'next/link';
 import { 
   ArrowLeftIcon,
@@ -85,14 +86,38 @@ export default function LiveMonitor() {
         .eq('exam_id', examId)
         .order('updated_at', { ascending: false });
 
-      // Fetch participant info map (username → nama, sekolah, cabang)
-      const { data: pData } = await supabase
-        .from('cbt_participants')
-        .select('username, full_name, school_origin, branch');
+      // Fetch participant info map from competition_entries
+      const { data: entriesData } = await supabase
+        .from('competition_entries')
+        .select('id, full_name, school_name, notes');
 
       const pMap: Record<string, any> = {};
-      (pData || []).forEach(p => {
-        if (p.username) pMap[p.username] = p;
+      (entriesData || []).forEach(entry => {
+        let ticketCode = "";
+        if (entry.notes) {
+          try {
+            const notesObj = JSON.parse(entry.notes);
+            if (notesObj.custom_ticket_id) {
+              ticketCode = notesObj.custom_ticket_id.toUpperCase();
+            }
+          } catch (e) {}
+        }
+        
+        if (!ticketCode) {
+          ticketCode = `NCC-${generateTicketCode(entry.id)}`;
+        }
+        
+        const cleanCode = ticketCode.toUpperCase();
+        const rawCode = cleanCode.replace("NCC-", "");
+        
+        const info = {
+          full_name: entry.full_name,
+          school_origin: entry.school_name,
+          branch: ""
+        };
+
+        pMap[cleanCode] = info;
+        pMap[rawCode] = info;
       });
       setParticipantMap(pMap);
 
@@ -188,7 +213,7 @@ export default function LiveMonitor() {
     const rows = [
       ['ID Peserta', 'Nama', 'Sekolah', 'Cabang', 'Status', 'Pelanggaran', 'Jam Mulai', 'Jam Submit'],
       ...participants.map(p => {
-        const info = participantMap[p.user_id] || {};
+        const info = p.user_id ? (participantMap[p.user_id.toUpperCase()] || participantMap[p.user_id.replace("NCC-", "").toUpperCase()] || { full_name: "", school_origin: "", branch: "" }) : { full_name: "", school_origin: "", branch: "" };
         const isBlocked = p.violations_count >= 3 && !p.submitted_at;
         const isDone = !!p.submitted_at;
         return [
@@ -243,7 +268,7 @@ export default function LiveMonitor() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return participants.filter(p => {
-      const info = participantMap[p.user_id] || {};
+      const info = p.user_id ? (participantMap[p.user_id.toUpperCase()] || participantMap[p.user_id.replace("NCC-", "").toUpperCase()] || { full_name: "", school_origin: "", branch: "" }) : { full_name: "", school_origin: "", branch: "" };
       const matchSearch = !q || 
         (p.user_id || '').toLowerCase().includes(q) ||
         (info.full_name || '').toLowerCase().includes(q) ||
@@ -393,7 +418,7 @@ export default function LiveMonitor() {
                 {filtered.map(p => {
                   const { isBlocked, isDone, isWarning, isActive } = classify(p);
                   const timer = !isDone ? getRemainingTime(p.started_at) : null;
-                  const info = participantMap[p.user_id] || {};
+                  const info = p.user_id ? (participantMap[p.user_id.toUpperCase()] || participantMap[p.user_id.replace("NCC-", "").toUpperCase()] || { full_name: "", school_origin: "", branch: "" }) : { full_name: "", school_origin: "", branch: "" };
 
                   return (
                     <div key={p.user_id} className={`relative p-4 rounded-[18px] border-2 flex flex-col gap-2.5 transition-all
