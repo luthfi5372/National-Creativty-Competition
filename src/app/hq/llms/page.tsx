@@ -1637,9 +1637,9 @@ const getLiveToken = (sessionId: string) => {
   const currentInterval = Math.floor(now / interval10Min);
   
   let token = "";
-  let idSum = 0;
+  let idSum = 5381;
   for (let i = 0; i < sessionId.length; i++) { 
-    idSum += sessionId.charCodeAt(i); 
+    idSum = ((idSum * 33) ^ sessionId.charCodeAt(i)) >>> 0; 
   }
   let seed = (idSum + currentInterval) % 10000;
   for (let i = 0; i < 6; i++) { 

@@ -838,9 +838,9 @@ function ModernHQDashboardContent() {
             
             const exam = exams[0];
             let expectedToken = "";
-            let idSum = 0;
+            let idSum = 5381;
             for (let i = 0; i < exam.id.length; i++) {
-              idSum += exam.id.charCodeAt(i);
+              idSum = ((idSum * 33) ^ exam.id.charCodeAt(i)) >>> 0;
             }
             let seed = (idSum + currentInterval) % 10000;
             for (let i = 0; i < 6; i++) {

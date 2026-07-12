@@ -167,9 +167,9 @@ export default function ParticipantLogin() {
         
         for (const interval of targetIntervals) {
           let expectedToken = "";
-          let idSum = 0;
+          let idSum = 5381;
           for (let i = 0; i < exam.id.length; i++) {
-            idSum += exam.id.charCodeAt(i);
+            idSum = ((idSum * 33) ^ exam.id.charCodeAt(i)) >>> 0;
           }
           let seed = (idSum + interval) % 10000;
           for (let i = 0; i < 6; i++) {
