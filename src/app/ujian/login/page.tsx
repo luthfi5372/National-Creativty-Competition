@@ -51,9 +51,18 @@ export default function ParticipantLogin() {
       // Contoh: NCC-A3X7Q2 → "A3X7Q2" → dicocokkan ke generateTicketCode(entry.id)
       const inputTicketNum = parseTicketNumber(ticketInput);
 
-      const matchedUser = allEntries.find(
-        (entry) => generateTicketCode(entry.id) === inputTicketNum
-      );
+      const matchedUser = allEntries.find((entry) => {
+        let customId = "";
+        if (entry.notes) {
+          try {
+            const notesObj = JSON.parse(entry.notes);
+            if (notesObj.custom_ticket_id) {
+              customId = notesObj.custom_ticket_id.replace(/^NCC-/i, "").trim().toUpperCase();
+            }
+          } catch (e) {}
+        }
+        return generateTicketCode(entry.id) === inputTicketNum || customId === inputTicketNum;
+      });
 
       if (!matchedUser) {
         setErrorMsg({

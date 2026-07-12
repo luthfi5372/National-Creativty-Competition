@@ -605,7 +605,7 @@ export default function GallerySection() {
     };
   });
 
-  const allGalleryItems = [...portfolioItems, ...dynamicItems];
+  const allGalleryItems = [...portfolioItems, ...dynamicItems].slice(0, 8);
 
   const filteredItems = activeFilter === "ALL" 
     ? allGalleryItems 

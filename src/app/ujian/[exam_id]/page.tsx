@@ -110,9 +110,7 @@ export default function ExamRoom() {
         }
 
         // 3. Lapor kehadiran CCTV
-        const userId = parsedUser.id
-          ? `NCC-${generateTicketCode(parsedUser.id)}`
-          : (parsedUser.nisn || parsedUser.username);
+        const userId = parsedUser.ticket_code || (parsedUser.id ? `NCC-${generateTicketCode(parsedUser.id)}` : (parsedUser.nisn || parsedUser.username));
         const { data: existingUser, error: checkErr } = await supabase
           .from('cbt_attempts')
           .select('*')
@@ -165,9 +163,7 @@ export default function ExamRoom() {
         const newCount = violationCount + 1;
         setViolationCount(newCount);
         
-        const cbtUserId = student.id
-          ? `NCC-${generateTicketCode(student.id)}`
-          : (student.nisn || student.username);
+        const cbtUserId = student.ticket_code || (student.id ? `NCC-${generateTicketCode(student.id)}` : (student.nisn || student.username));
 
         await supabase.from('cbt_attempts').update({ 
           violations_count: newCount,
@@ -214,9 +210,7 @@ export default function ExamRoom() {
     const newAnswers = { ...answers, [questionId]: newOptionValue };
     setAnswers(newAnswers);
     if (doubtfulAnswers[questionId]) setDoubtfulAnswers(prev => ({ ...prev, [questionId]: false }));
-    const userId = student?.id
-      ? `NCC-${generateTicketCode(student.id)}`
-      : (student?.nisn || student?.username);
+    const userId = student?.ticket_code || (student?.id ? `NCC-${generateTicketCode(student.id)}` : (student?.nisn || student?.username));
     
     // Keamanan ekstra saat mengirim jawaban
     if (userId && examId && examId !== 'undefined') {
@@ -303,9 +297,7 @@ export default function ExamRoom() {
       finalScore = Math.max(0, Math.round(finalScore * 100) / 100);
 
       // 2. Kirim Data ke Pusat Komando
-      const userId = student?.id
-        ? `NCC-${generateTicketCode(student.id)}`
-        : (student?.nisn || student?.username);
+      const userId = student?.ticket_code || (student?.id ? `NCC-${generateTicketCode(student.id)}` : (student?.nisn || student?.username));
       if (userId && examId && examId !== 'undefined') {
         const { error } = await supabase.from('cbt_attempts').update({
           submitted_at: new Date().toISOString(),
@@ -512,9 +504,7 @@ export default function ExamRoom() {
                             }}
                             onBlur={async () => {
                               const val = answers[currentQ.id] || '';
-                              const userId = student?.id
-                                ? `NCC-${generateTicketCode(student.id)}`
-                                : (student?.nisn || student?.username);
+                              const userId = student?.ticket_code || (student?.id ? `NCC-${generateTicketCode(student.id)}` : (student?.nisn || student?.username));
                               if (userId && examId && examId !== 'undefined') {
                                 await supabase.from('cbt_attempts').update({ 
                                   answers: { ...answers, [currentQ.id]: val },
@@ -540,9 +530,7 @@ export default function ExamRoom() {
                             }}
                             onBlur={async () => {
                               const val = answers[currentQ.id] || '';
-                              const userId = student?.id
-                                ? `NCC-${generateTicketCode(student.id)}`
-                                : (student?.nisn || student?.username);
+                              const userId = student?.ticket_code || (student?.id ? `NCC-${generateTicketCode(student.id)}` : (student?.nisn || student?.username));
                               if (userId && examId && examId !== 'undefined') {
                                 await supabase.from('cbt_attempts').update({ 
                                   answers: { ...answers, [currentQ.id]: val },

@@ -121,9 +121,7 @@ export default function StudentDashboard() {
           .eq('exam_id', parsedUser.active_exam_id);
         setQuestionCount(count || 0);
 
-        const userId = parsedUser.id
-          ? `NCC-${generateTicketCode(parsedUser.id)}`
-          : (parsedUser.nisn || parsedUser.username);
+        const userId = parsedUser.ticket_code || (parsedUser.id ? `NCC-${generateTicketCode(parsedUser.id)}` : (parsedUser.nisn || parsedUser.username));
 
         const { data: existingAttempt } = await supabase
           .from('cbt_attempts').select('id, submitted_at, status_passing')
@@ -166,7 +164,7 @@ export default function StudentDashboard() {
     // Buka tab baru berisi HTML sertifikat yang siap di-print
     const namaPeserta = student?.full_name || student?.nama_lengkap || 'Peserta NCC';
     const sekolah = student?.school_name || student?.school || '-';
-    const ticketCode = student?.id ? `NCC-${generateTicketCode(student.id)}` : '-';
+    const ticketCode = student?.ticket_code || (student?.id ? `NCC-${generateTicketCode(student.id)}` : '-');
     const tanggal = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
     const html = `<!DOCTYPE html>
@@ -244,7 +242,7 @@ export default function StudentDashboard() {
   }
 
   const isExamReady = questionCount !== null && questionCount > 0;
-  const ticketCode = student.id ? `NCC-${generateTicketCode(student.id)}` : (student.nisn || '-');
+  const ticketCode = student.ticket_code || (student.id ? `NCC-${generateTicketCode(student.id)}` : (student.nisn || '-'));
   const namaPeserta = student.full_name || student.nama_lengkap || 'Peserta NCC';
 
   return (

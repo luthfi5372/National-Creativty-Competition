@@ -1,3 +1,17 @@
+const getEntryTicketCode = (entry: any): string => {
+  if (!entry) return "";
+  if (entry.notes) {
+    try {
+      const notesObj = JSON.parse(entry.notes);
+      if (notesObj.custom_ticket_id) {
+        const cid = notesObj.custom_ticket_id;
+        return cid.toUpperCase().startsWith("NCC-") ? cid : `NCC-${cid}`;
+      }
+    } catch (e) {}
+  }
+  return `NCC-${generateTicketCode(entry.id)}`;
+};
+
 "use client";
 export const dynamic = 'force-dynamic';
 
@@ -107,7 +121,7 @@ const ParticipantRow = memo(({ entry, onRowClick, onIdCardClick, onDeleteClick, 
           className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
         />
       </td>
-      <td className="py-4 px-6 font-black text-blue-600">NCC-{generateTicketCode(entry.id)}</td>
+      <td className="py-4 px-6 font-black text-blue-600">{getEntryTicketCode(entry)}</td>
       <td className="py-4 px-6 flex items-center gap-3">
          {photoUrl ? (
            <img 
@@ -358,7 +372,7 @@ const VerificationCard = memo(({ entry, onUpdateStatus, onDeleteClick }: Verific
         <div className="min-w-0">
           <h4 className="font-bold text-slate-800 text-base leading-tight truncate">{entry.full_name || "Peserta Anonim"}</h4>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">NCC-{generateTicketCode(entry.id)}</span>
+            <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">{getEntryTicketCode(entry)}</span>
             <span className="text-xs text-slate-500 truncate max-w-[180px]">{entry.email}</span>
           </div>
           {entry.school_name && (
@@ -2700,6 +2714,32 @@ function ModernHQDashboardContent() {
             if (uniqueIds.size !== uploadedIds.length) {
               throw new Error("Ditemukan ID Tiket yang duplikat di dalam file CSV. Setiap baris harus memiliki ID Tiket yang unik.");
             }
+
+            // Cek duplikasi ID dengan database Supabase
+            const { data: existingEntries } = await supabase.from('competition_entries').select('id, notes');
+            const existingTicketCodes = new Set(
+              existingEntries?.map((e: any) => {
+                let code = getEntryTicketCode(e);
+                if (e.notes) {
+                  try {
+                    const notesObj = JSON.parse(e.notes);
+                    if (notesObj.custom_ticket_id) {
+                      code = notesObj.custom_ticket_id;
+                    }
+                  } catch (err) {}
+                }
+                return code.toUpperCase().trim();
+              }) || []
+            );
+
+            const duplicateDbIds = uploadedIds.filter(id => {
+              const formattedId = id.startsWith("NCC-") ? id : `NCC-${id}`;
+              return existingTicketCodes.has(formattedId);
+            });
+
+            if (duplicateDbIds.length > 0) {
+              throw new Error(`Gagal impor: ID Tiket Kustom berikut sudah terdaftar di database: ${duplicateDbIds.slice(0, 5).join(", ")}${duplicateDbIds.length > 5 ? '... dan lainnya' : ''}. Harap gunakan ID tiket yang unik.`);
+            }
           }
           
           const activeWave = waves.find((w: any) => w.status === 'Aktif');
@@ -3038,7 +3078,7 @@ function ModernHQDashboardContent() {
       }
 
       return [
-        `NCC-${generateTicketCode(e.id)}`,
+        getEntryTicketCode(e),
         e.full_name || "-",
         e.email || "-",
         e.nisn || "-",
@@ -3145,7 +3185,7 @@ function ModernHQDashboardContent() {
       } catch (err) {}
 
       return [
-        `NCC-${generateTicketCode(e.id)}`,
+        getEntryTicketCode(e),
         e.full_name || "-",
         e.email || "-",
         e.school_name || e.school || "-",
@@ -3217,7 +3257,7 @@ function ModernHQDashboardContent() {
         const query = searchQuery.toLowerCase();
         return (e.full_name || "").toLowerCase().includes(query) || 
                (e.email || "").toLowerCase().includes(query) || 
-               `ncc-${generateTicketCode(e.id)}`.toLowerCase().includes(query);
+               getEntryTicketCode(e).toLowerCase().includes(query);
       })
       .filter(e => filterCategory === "All" || (e.competition_type || e.category) === filterCategory);
   }, [realEntries, filterProgress, filterWave, searchQuery, filterCategory]);
@@ -4219,7 +4259,7 @@ function ModernHQDashboardContent() {
                         return (e.full_name || "").toLowerCase().includes(query) || 
                                (e.email || "").toLowerCase().includes(query) || 
                                (e.school_name || e.school || "").toLowerCase().includes(query) ||
-                               `ncc-${generateTicketCode(e.id)}`.toLowerCase().includes(query);
+                               getEntryTicketCode(e).toLowerCase().includes(query);
                       });
 
                     if (filtered.length === 0) {
@@ -4251,7 +4291,7 @@ function ModernHQDashboardContent() {
                           className="hover:bg-slate-50/50 transition-colors"
                         >
                           <td className="py-4 px-6 font-black text-blue-600">
-                            NCC-{generateTicketCode(entry.id)}
+                            {getEntryTicketCode(entry)}
                           </td>
                           <td className="py-4 px-6">
                             <div className="font-bold text-slate-800">{entry.full_name || "Peserta Anonim"}</div>
@@ -4521,7 +4561,7 @@ function ModernHQDashboardContent() {
                                   />
                                   <div className="flex flex-col">
                                     <span className="text-sm font-bold text-slate-800">{entry.full_name || entry.email || "Peserta Anonim"}</span>
-                                    <span className="text-[10px] text-slate-500 font-medium">NCC-{entry.id ? generateTicketCode(entry.id) : "-"} • {entry.competition_type || entry.category || "Belum Pilih"}</span>
+                                    <span className="text-[10px] text-slate-500 font-medium">{getEntryTicketCode(entry)} • {entry.competition_type || entry.category || "Belum Pilih"}</span>
                                   </div>
                                 </label>
                               );
@@ -6719,7 +6759,7 @@ function ModernHQDashboardContent() {
                      </div>
                    
                      <div className="inline-block px-4 py-1.5 bg-black/20 rounded-full border border-white/10 text-xs text-white font-mono mt-2 mb-2">
-                       ID: NCC-{generateTicketCode(selectedIdCard.id)}
+                       ID: {getEntryTicketCode(selectedIdCard)}
                      </div>
                    </div>
                  </div>
@@ -7592,7 +7632,7 @@ function ModernHQDashboardContent() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {(selectedSchoolGroup?.students || []).map((student: any) => {
-                  let ticketCode = generateTicketCode(student.id);
+                  let ticketCode = getEntryTicketCode(student).replace(/^NCC-/i, "");
                   let paymentStatus = student.payment_status || "Unpaid";
                   
                   return (

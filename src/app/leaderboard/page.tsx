@@ -285,7 +285,16 @@ export default function LeaderboardPage() {
         } catch (e) {}
       }
 
-      const ticketCode = `NCC-${generateTicketCode(entry.id)}`;
+      let ticketCode = `NCC-${generateTicketCode(entry.id)}`;
+      if (entry.notes) {
+        try {
+          const notesObj = JSON.parse(entry.notes);
+          if (notesObj.custom_ticket_id) {
+            const cid = notesObj.custom_ticket_id;
+            ticketCode = cid.toUpperCase().startsWith("NCC-") ? cid : `NCC-${cid}`;
+          }
+        } catch (e) {}
+      }
       const { data: attempt } = await supabase
         .from("cbt_attempts").select("status_passing").eq("user_id", ticketCode).maybeSingle();
       let statusPassing: "PASSED" | "FAILED" | "PENDING" | null = null;
