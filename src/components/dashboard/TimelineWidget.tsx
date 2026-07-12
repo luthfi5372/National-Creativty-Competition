@@ -235,6 +235,11 @@ export default function TimelineWidget({ userCategory, userStatus, notes, global
     const start = startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null;
     const end = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null;
 
+    const label = item.label.toLowerCase();
+    if (label.includes('pendaftaran') || label.includes('registrasi')) {
+      return userStatus === 'Verified' ? 'completed' : 'active';
+    }
+
     if (start && today < start) {
       return "locked";
     }
