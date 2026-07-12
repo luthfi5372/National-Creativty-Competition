@@ -7282,7 +7282,7 @@ function ModernHQDashboardContent() {
                       </tbody>
                     </table>
                   </div>
-
+                </div>
                 {/* Contoh CSV mode otomatis */}
                 <div className="rounded-2xl bg-slate-900 p-4 overflow-x-auto">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">📄 Contoh CSV — Mode Otomatis (Tanpa Custom ID)</p>
