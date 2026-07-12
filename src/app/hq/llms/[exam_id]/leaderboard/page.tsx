@@ -471,95 +471,102 @@ export default function LiveLeaderboard() {
             // 1. Pertanyaan
             const cleanQText = `"${String(q.question_text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
 
-            // 2. Jawaban Peserta (Spill Pilihan Ganda if qType is pg/standard MC)
-            let cleanUserAns = '"(kosong)"';
-            if (userAns) {
-              if (qType === 'essay' || qType === 'isian') {
-                cleanUserAns = `"${String(userAns).replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+            // Prepare list of options to output as rows for this question
+            const answersToOutput: string[] = [];
+
+            if (!userAns) {
+              answersToOutput.push('"(kosong)"');
+            } else if (qType === 'essay' || qType === 'isian') {
+              answersToOutput.push(`"${String(userAns).replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`);
+            } else {
+              // Pilihan Ganda (PG) - Split into multiple rows if they selected multiple letters
+              const selectedLetters = String(userAns).split('');
+              if (selectedLetters.length === 0) {
+                answersToOutput.push('"(kosong)"');
               } else {
-                // Pilihan Ganda (PG) - Spill the answer option text
-                const selectedLetters = String(userAns).split('');
-                const spilledOptions = selectedLetters.map(letter => {
+                selectedLetters.forEach(letter => {
                   const upperL = letter.toUpperCase();
                   const optionText = q.options?.[upperL] || q.options?.[letter.toLowerCase()] || '';
-                  return optionText ? `${upperL} (${optionText})` : upperL;
+                  const displayAns = optionText ? `${upperL} (${optionText})` : upperL;
+                  answersToOutput.push(`"${displayAns.replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`);
                 });
-                const combinedText = spilledOptions.join(' | ');
-                cleanUserAns = `"${combinedText.replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
               }
             }
 
-            // 3. Status & Poin
-            let statusText = '';
-            let pointEarned = 0;
+            // Loop through each split answer and output a row in the CSV
+            answersToOutput.forEach((cleanUserAns, subIndex) => {
+              // Calculate status and points for each row
+              let statusText = '';
+              let pointEarned = 0;
 
-            if (!userAns) {
-              statusText = 'KOSONG';
-              pointEarned = examConfig?.empty_point || 0;
-            } else if (qType === 'essay') {
-              const essayScore = item.answers?.essay_grades?.[q.id];
-              if (essayScore === undefined) {
-                statusText = 'BELUM DINILAI';
-                pointEarned = 0;
-              } else {
-                statusText = 'ESSAY';
-                pointEarned = Number(essayScore);
-              }
-            } else if (qType === 'isian') {
-              const correctAnswers = String(correctKey).toUpperCase().split('|').map((x) => x.trim());
-              const isCorrect = correctAnswers.includes(String(userAns).trim().toUpperCase());
-              if (isCorrect) {
-                statusText = 'BENAR';
-                pointEarned = Number(q.options?.points?.correct ?? examConfig?.correct_point ?? 4);
-              } else {
-                statusText = 'SALAH';
-                const penalty = examConfig?.penalty_point || 0;
-                pointEarned = penalty <= 0 ? penalty : -penalty;
-              }
-            } else {
-              // PG
-              if (q.options && typeof q.options === 'object' && q.options.points) {
-                const selectedLetters = String(userAns).split('');
-                let pts = 0;
-                selectedLetters.forEach((l) => {
-                  pts += Number(q.options.points[l] || 0);
-                });
-                pointEarned = pts;
-                if (pts > 0) {
-                  statusText = 'BENAR';
+              if (!userAns) {
+                statusText = 'KOSONG';
+                pointEarned = examConfig?.empty_point || 0;
+              } else if (qType === 'essay') {
+                const essayScore = item.answers?.essay_grades?.[q.id];
+                if (essayScore === undefined) {
+                  statusText = 'BELUM DINILAI';
+                  pointEarned = 0;
                 } else {
-                  statusText = 'SALAH';
+                  statusText = 'ESSAY';
+                  pointEarned = Number(essayScore);
                 }
-              } else {
-                const isCorrect = String(userAns).trim().toUpperCase() === String(correctKey).trim().toUpperCase();
+              } else if (qType === 'isian') {
+                const correctAnswers = String(correctKey).toUpperCase().split('|').map((x) => x.trim());
+                const isCorrect = correctAnswers.includes(String(userAns).trim().toUpperCase());
                 if (isCorrect) {
                   statusText = 'BENAR';
-                  pointEarned = examConfig?.correct_point ?? 4;
+                  pointEarned = Number(q.options?.points?.correct ?? examConfig?.correct_point ?? 4);
                 } else {
                   statusText = 'SALAH';
                   const penalty = examConfig?.penalty_point || 0;
                   pointEarned = penalty <= 0 ? penalty : -penalty;
                 }
+              } else {
+                // PG
+                if (q.options && typeof q.options === 'object' && q.options.points) {
+                  const selectedLetters = String(userAns).split('');
+                  let pts = 0;
+                  selectedLetters.forEach((l) => {
+                    pts += Number(q.options.points[l] || 0);
+                  });
+                  pointEarned = pts;
+                  if (pts > 0) {
+                    statusText = 'BENAR';
+                  } else {
+                    statusText = 'SALAH';
+                  }
+                } else {
+                  const isCorrect = String(userAns).trim().toUpperCase() === String(correctKey).trim().toUpperCase();
+                  if (isCorrect) {
+                    statusText = 'BENAR';
+                    pointEarned = examConfig?.correct_point ?? 4;
+                  } else {
+                    statusText = 'SALAH';
+                    const penalty = examConfig?.penalty_point || 0;
+                    pointEarned = penalty <= 0 ? penalty : -penalty;
+                  }
+                }
               }
-            }
 
-            const row = [
-              realRank,
-              `"${item.user_id}"`,
-              `"${(info.full_name || '').replace(/"/g, '""')}"`,
-              `"${(info.school_name || '').replace(/"/g, '""')}"`,
-              `"Soal ${index + 1}"`,
-              cleanQText,
-              cleanUserAns,
-              `"${statusText}"`,
-              pointEarned,
-              checkHasUngradedEssay(item, questions) ? '"Ditinjau"' : (item.score ?? 0),
-              item.violations_count || 0,
-              `"${item.submitted_at ? 'SELESAI' : 'BERLANGSUNG'}"`,
-              `"${new Date(item.updated_at).toLocaleString('id-ID')}"`
-            ];
+              const row = [
+                realRank,
+                `"${item.user_id}"`,
+                `"${(info.full_name || '').replace(/"/g, '""')}"`,
+                `"${(info.school_name || '').replace(/"/g, '""')}"`,
+                `"Soal ${index + 1}${answersToOutput.length > 1 ? ` - Pilihan ${subIndex + 1}` : ''}"`,
+                cleanQText,
+                cleanUserAns,
+                `"${statusText}"`,
+                pointEarned,
+                checkHasUngradedEssay(item, questions) ? '"Ditinjau"' : (item.score ?? 0),
+                item.violations_count || 0,
+                `"${item.submitted_at ? 'SELESAI' : 'BERLANGSUNG'}"`,
+                `"${new Date(item.updated_at).toLocaleString('id-ID')}"`
+              ];
 
-            rows.push(row.join(','));
+              rows.push(row.join(','));
+            });
           });
         });
 
