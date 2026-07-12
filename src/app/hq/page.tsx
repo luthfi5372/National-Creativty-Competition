@@ -79,12 +79,13 @@ interface ParticipantRowProps {
   onRowClick: (entry: any) => void;
   onIdCardClick: (entry: any) => void;
   onDeleteClick: (entry: any) => void;
+  onEditCustomTicket: (entry: any) => void;
   waveName?: string;
   isSelected: boolean;
   onSelectToggle: () => void;
 }
 
-const ParticipantRow = memo(({ entry, onRowClick, onIdCardClick, onDeleteClick, waveName, isSelected, onSelectToggle }: ParticipantRowProps) => {
+const ParticipantRow = memo(({ entry, onRowClick, onIdCardClick, onDeleteClick, onEditCustomTicket, waveName, isSelected, onSelectToggle }: ParticipantRowProps) => {
   const dateObj = entry.created_at ? new Date(entry.created_at) : new Date();
   const dateStr = dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
   const timeStr = dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -230,6 +231,16 @@ const ParticipantRow = memo(({ entry, onRowClick, onIdCardClick, onDeleteClick, 
         className="py-4 px-6 text-center sticky right-0 bg-white group-hover:bg-[#f2f6fc] transition-colors shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] border-l border-slate-100 z-10"
       >
         <div className="flex items-center justify-center gap-2">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditCustomTicket(entry);
+            }}
+            className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg transition-all shadow-sm border border-indigo-100"
+            title="Kustom ID Tiket"
+          >
+            <Pencil size={18} />
+          </button>
           <button 
             onClick={(e) => {
               e.stopPropagation();
@@ -2607,6 +2618,85 @@ function ModernHQDashboardContent() {
       showToast(`Gagal memindahkan gelombang massal: ${err.message || err}`, "error");
     }
   };
+
+  // --- KUSTOM / EDIT ID TIKET PESERTA ---
+  const handleEditCustomTicket = async (entry: any) => {
+    if (!entry) return;
+    
+    let currentCustomId = "";
+    if (entry.notes) {
+      try {
+        const notesObj = JSON.parse(entry.notes);
+        currentCustomId = notesObj.custom_ticket_id || "";
+      } catch (e) {}
+    }
+
+    const newCustomId = prompt(
+      `Ubah ID Tiket Kustom untuk: ${entry.full_name || "Peserta"}\nID Tiket Saat Ini: ${getEntryTicketCode(entry)}\n\nMasukkan ID Tiket Kustom baru (atau kosongkan untuk menggunakan ID otomatis):`,
+      currentCustomId
+    );
+
+    if (newCustomId === null) return;
+
+    const cleanNewId = newCustomId.trim().toUpperCase();
+
+    if (cleanNewId) {
+      const duplicate = realEntries.find((e: any) => {
+        if (e.id === entry.id) return false;
+        if (e.notes) {
+          try {
+            const notesObj = JSON.parse(e.notes);
+            if (notesObj.custom_ticket_id) {
+              const cid = notesObj.custom_ticket_id.toUpperCase();
+              return cid === cleanNewId || cid.replace("NCC-", "") === cleanNewId.replace("NCC-", "");
+            }
+          } catch (err) {}
+        }
+        return false;
+      });
+
+      if (duplicate) {
+        alert(`Gagal: ID Tiket "${cleanNewId}" sudah terdaftar untuk peserta lain (${duplicate.full_name || "Tanpa Nama"})!`);
+        return;
+      }
+    }
+
+    try {
+      let notesObj: any = {};
+      if (entry.notes) {
+        try {
+          notesObj = JSON.parse(entry.notes);
+        } catch (e) {}
+      }
+
+      if (cleanNewId) {
+        notesObj.custom_ticket_id = cleanNewId;
+      } else {
+        delete notesObj.custom_ticket_id;
+      }
+
+      const updatedNotes = JSON.stringify(notesObj);
+
+      const { error } = await supabase
+        .from('competition_entries')
+        .update({ notes: updatedNotes })
+        .eq('id', entry.id);
+
+      if (error) throw error;
+
+      setRealEntries(prev => prev.map(e => e.id === entry.id ? { ...e, notes: updatedNotes } : e));
+      
+      if (selectedParticipant && selectedParticipant.id === entry.id) {
+        setSelectedParticipant((prev: any) => ({ ...prev, notes: updatedNotes }));
+      }
+
+      showToast(`ID Tiket untuk ${entry.full_name || "Peserta"} berhasil diperbarui!`, "success");
+    } catch (err: any) {
+      console.error("Gagal memperbarui ID Tiket Kustom:", err);
+      showToast(`Gagal memperbarui ID Tiket: ${err.message || err}`, "error");
+    }
+  };
+
   const handleAddParticipant = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsAdding(true);
@@ -3737,6 +3827,22 @@ function ModernHQDashboardContent() {
                     </div>
                   </div>
 
+                  {selectedEntryIds.size === 1 && (
+                    <button
+                      onClick={() => {
+                        const singleId = Array.from(selectedEntryIds)[0];
+                        const entryObj = realEntries.find((e: any) => e.id === singleId);
+                        if (entryObj) {
+                          handleEditCustomTicket(entryObj);
+                        }
+                      }}
+                      className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-600 px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm"
+                    >
+                      <Pencil size={13} />
+                      Custom ID Tiket
+                    </button>
+                  )}
+
                   <button
                     onClick={() => setSelectedEntryIds(new Set())}
                     className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
@@ -3812,6 +3918,7 @@ function ModernHQDashboardContent() {
                         onRowClick={setSelectedParticipant}
                         onIdCardClick={setSelectedIdCard}
                         onDeleteClick={(e) => setDeleteModal({ show: true, id: e.id, userId: e.user_id, name: e.full_name })}
+                        onEditCustomTicket={handleEditCustomTicket}
                       />
                     ))
                   )}
