@@ -93,22 +93,17 @@ export default function LiveMonitor() {
 
       const pMap: Record<string, any> = {};
       (entriesData || []).forEach(entry => {
-        let ticketCode = "";
+        let customTicketCode = "";
         if (entry.notes) {
           try {
             const notesObj = JSON.parse(entry.notes);
             if (notesObj.custom_ticket_id) {
-              ticketCode = notesObj.custom_ticket_id.toUpperCase();
+              customTicketCode = notesObj.custom_ticket_id.toUpperCase();
             }
           } catch (e) {}
         }
         
-        if (!ticketCode) {
-          ticketCode = `NCC-${generateTicketCode(entry.id)}`;
-        }
-        
-        const cleanCode = ticketCode.toUpperCase();
-        const rawCode = cleanCode.replace("NCC-", "");
+        const generatedTicketCode = `NCC-${generateTicketCode(entry.id)}`.toUpperCase();
         
         const info = {
           full_name: entry.full_name,
@@ -116,8 +111,15 @@ export default function LiveMonitor() {
           branch: ""
         };
 
-        pMap[cleanCode] = info;
-        pMap[rawCode] = info;
+        // 1. Map by generated ticket code
+        pMap[generatedTicketCode] = info;
+        pMap[generatedTicketCode.replace("NCC-", "")] = info;
+
+        // 2. Map by custom ticket code if available
+        if (customTicketCode) {
+          pMap[customTicketCode] = info;
+          pMap[customTicketCode.replace("NCC-", "")] = info;
+        }
       });
       setParticipantMap(pMap);
 

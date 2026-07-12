@@ -162,20 +162,19 @@ export default function LiveLeaderboard() {
     if (entriesRes && entriesRes.data) {
       const pMap: Record<string, any> = {};
       entriesRes.data.forEach((entry: any) => {
-        let ticketCode = "";
+        let customTicketCode = "";
         if (entry.notes) {
           try {
             const notesObj = JSON.parse(entry.notes);
             if (notesObj.custom_ticket_id) {
-              ticketCode = notesObj.custom_ticket_id.toUpperCase();
+              customTicketCode = notesObj.custom_ticket_id.toUpperCase();
             }
           } catch (e) {}
         }
-        if (!ticketCode) {
-          ticketCode = `NCC-${generateTicketCode(entry.id)}`;
-        }
-        const cleanCode = ticketCode.toUpperCase();
-        pMap[cleanCode] = {
+        
+        const generatedTicketCode = `NCC-${generateTicketCode(entry.id)}`.toUpperCase();
+        
+        const participantInfo = {
           full_name: entry.full_name,
           school_name: entry.school_name || entry.school || "",
           email: entry.email,
@@ -188,6 +187,16 @@ export default function LiveLeaderboard() {
           mentor_name: entry.mentor_name,
           whatsapp: entry.whatsapp_number || entry.phone || "",
         };
+
+        // 1. Map by generated ticket code (e.g. NCC-9EU5JE)
+        pMap[generatedTicketCode] = participantInfo;
+        pMap[generatedTicketCode.replace("NCC-", "")] = participantInfo;
+
+        // 2. Map by custom ticket code if available (e.g. NCC-17772)
+        if (customTicketCode) {
+          pMap[customTicketCode] = participantInfo;
+          pMap[customTicketCode.replace("NCC-", "")] = participantInfo;
+        }
       });
       setParticipantMap(pMap);
     }
