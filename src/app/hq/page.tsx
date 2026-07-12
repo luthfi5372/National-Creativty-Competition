@@ -1,3 +1,6 @@
+"use client";
+export const dynamic = 'force-dynamic';
+
 const getEntryTicketCode = (entry: any): string => {
   if (!entry) return "";
   if (entry.notes) {
@@ -12,8 +15,6 @@ const getEntryTicketCode = (entry: any): string => {
   return `NCC-${generateTicketCode(entry.id)}`;
 };
 
-"use client";
-export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useRef, memo, Suspense } from "react";
 import * as htmlToImage from 'html-to-image';
