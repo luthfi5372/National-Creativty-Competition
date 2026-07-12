@@ -599,13 +599,23 @@ export default function GallerySection() {
       id: `admin-${index}`,
       category: isObject ? (item.category || "GALLERY") : "GALLERY",
       label: isObject ? (item.label || `Event Moment ${index + 1}`) : `Event Moment ${index + 1}`,
+      description: isObject ? (item.description || "") : "",
       src: isObject ? item.url : item,
       span: index % 3 === 0 ? "col-span-1 md:col-span-2 row-span-1" : "col-span-1 row-span-1",
       bg: "from-indigo-500/80 to-purple-600/80"
     };
   });
 
-  const allGalleryItems = [...portfolioItems, ...dynamicItems].slice(0, 8);
+  const allGalleryItems = [...portfolioItems, ...dynamicItems].slice(0, 5).map((item, index) => {
+    let span = "col-span-1 md:col-span-2 row-span-1";
+    if (index === 0) {
+      span = "col-span-1 md:col-span-2 row-span-2";
+    }
+    return {
+      ...item,
+      span
+    };
+  });
 
   const filteredItems = activeFilter === "ALL" 
     ? allGalleryItems 
@@ -696,6 +706,7 @@ export default function GallerySection() {
                   fill
                   sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
                   priority={item.id === "admin-0" || item.id === "admin-1"}
+                  quality={30}
                   className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
 
