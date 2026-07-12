@@ -413,7 +413,9 @@ export default function LiveLeaderboard() {
         '"Pelanggaran"', '"Status Submit"', '"Terakhir Update"'
       ];
       questions.forEach((q, i) => {
+        headers.push(`"Soal ${i + 1}: Pertanyaan"`);
         headers.push(`"Soal ${i + 1}: Jawaban Peserta"`);
+        headers.push(`"Soal ${i + 1}: Status"`);
         headers.push(`"Soal ${i + 1}: Skor"`);
       });
 
@@ -428,33 +430,42 @@ export default function LiveLeaderboard() {
           const correctKey = q.correct_answer || q.answer || '';
           const qType = q.options?.type || 'pg';
 
+          // 1. Pertanyaan
+          const cleanQText = `"${String(q.question_text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+
           // 4. Jawaban Peserta
           const cleanUserAns = userAns 
             ? `"${String(userAns).replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`
             : '"(kosong)"';
 
           // 5. Status & 6. Poin
+          let statusText = '';
           let pointEarned = 0;
 
           if (!userAns) {
             kosong++;
+            statusText = 'KOSONG';
             pointEarned = examConfig?.empty_point || 0;
           } else if (qType === 'essay') {
             const essayScore = item.answers?.essay_grades?.[q.id];
             if (essayScore === undefined) {
+              statusText = 'BELUM DINILAI';
               pointEarned = 0;
             } else {
+              statusText = 'ESSAY';
               pointEarned = Number(essayScore);
               if (pointEarned > 0) benar++; else salah++;
             }
           } else if (qType === 'isian') {
-            const correctAnswers = String(correctKey).toUpperCase().split('|').map((x: string) => x.trim());
+            const correctAnswers = String(correctKey).toUpperCase().split('|').map((x) => x.trim());
             const isCorrect = correctAnswers.includes(String(userAns).trim().toUpperCase());
             if (isCorrect) {
               benar++;
+              statusText = 'BENAR';
               pointEarned = Number(q.options?.points?.correct ?? examConfig?.correct_point ?? 4);
             } else {
               salah++;
+              statusText = 'SALAH';
               const penalty = examConfig?.penalty_point || 0;
               pointEarned = penalty <= 0 ? penalty : -penalty;
             }
@@ -463,29 +474,35 @@ export default function LiveLeaderboard() {
             if (q.options && typeof q.options === 'object' && q.options.points) {
               const selectedLetters = String(userAns).split('');
               let pts = 0;
-              selectedLetters.forEach((l: string) => {
+              selectedLetters.forEach((l) => {
                 pts += Number(q.options.points[l] || 0);
               });
               pointEarned = pts;
               if (pts > 0) {
                 benar++;
+                statusText = 'BENAR';
               } else {
                 salah++;
+                statusText = 'SALAH';
               }
             } else {
               const isCorrect = String(userAns).trim().toUpperCase() === String(correctKey).trim().toUpperCase();
               if (isCorrect) {
                 benar++;
+                statusText = 'BENAR';
                 pointEarned = examConfig?.correct_point ?? 4;
               } else {
                 salah++;
+                statusText = 'SALAH';
                 const penalty = examConfig?.penalty_point || 0;
                 pointEarned = penalty <= 0 ? penalty : -penalty;
               }
             }
           }
 
+          qCols.push(cleanQText);
           qCols.push(cleanUserAns);
+          qCols.push(`"${statusText}"`);
           qCols.push(String(pointEarned));
         });
 
@@ -699,30 +716,36 @@ export default function LiveLeaderboard() {
               </div>
             )}
 
-            {/* Konten soal */}
-            <div className="p-6 overflow-y-auto space-y-4 flex-1">
-              {reviewLoading ? (
-                <div className="flex flex-col items-center justify-center py-20">
-                  <RefreshCw className="w-8 h-8 animate-spin text-[#5145cd] mb-3" />
-                  <p className="text-sm font-bold text-gray-400">Memuat soal...</p>
-                </div>
-              ) : reviewQuestions.length === 0 ? (
-                <div className="text-center py-20 text-gray-400">
-                  <p className="text-sm font-bold">Soal tidak ditemukan.</p>
-                </div>
-              ) : (
-                (() => {
-                  const filtered = getFilteredQuestions();
-                  if (filtered.length === 0) {
-                    return (
-                      <div className="text-center py-20 bg-white rounded-[24px] border border-dashed border-gray-200">
-                        <p className="text-sm font-black text-gray-400 uppercase tracking-widest">Tidak Ada Soal</p>
-                        <p className="text-xs text-gray-400 mt-1 font-medium">Tidak ada soal yang cocok dengan filter yang dipilih.</p>
-                      </div>
-                    );
-                  }
+            {/* Layout Utama CBT-Style: 2 Kolom (Kiri: Soal, Kanan: Peta Soal/Navigasi) */}
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-[500px]">
+              
+              {/* Kolom Kiri: Kartu Soal & Jawaban */}
+              <div className="flex-1 p-6 overflow-y-auto space-y-4">
+                {reviewLoading ? (
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <RefreshCw className="w-8 h-8 animate-spin text-[#5145cd] mb-3" />
+                    <p className="text-sm font-bold text-gray-400">Memuat soal...</p>
+                  </div>
+                ) : reviewQuestions.length === 0 ? (
+                  <div className="text-center py-20 text-gray-400">
+                    <p className="text-sm font-bold">Soal tidak ditemukan.</p>
+                  </div>
+                ) : (
+                  (() => {
+                    const filtered = getFilteredQuestions();
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="text-center py-20 bg-white rounded-[24px] border border-dashed border-gray-200">
+                          <p className="text-sm font-black text-gray-400 uppercase tracking-widest">Tidak Ada Soal</p>
+                          <p className="text-xs text-gray-400 mt-1 font-medium">Tidak ada soal yang cocok dengan filter yang dipilih.</p>
+                        </div>
+                      );
+                    }
 
-                  return filtered.map((q) => {
+                    const safeIndex = activeReviewIndex >= filtered.length ? 0 : activeReviewIndex;
+                    const q = filtered[safeIndex];
+                    if (!q) return null;
+
                     const originalIdx = reviewQuestions.findIndex(rq => rq.id === q.id);
                     const userAnswer = selectedAttempt.answers?.[q.id];
                     const correctKey = q.correct_answer || q.answer || '';
@@ -764,7 +787,7 @@ export default function LiveLeaderboard() {
                           : 'bg-rose-50/30';
 
                     return (
-                      <div key={q.id} className={`rounded-[20px] border-2 p-5 ${borderColor} ${bgColor} bg-white`}>
+                      <div key={q.id} className={`rounded-[20px] border-2 p-5 ${borderColor} ${bgColor} bg-white transition-all duration-300`}>
                         {/* Soal header */}
                         <div className="flex justify-between items-center mb-3">
                           <div className="flex items-center gap-2">
@@ -794,7 +817,7 @@ export default function LiveLeaderboard() {
                               </span>
                             ) : (
                               <span className="flex items-center gap-1 px-2.5 py-1 bg-rose-100 text-rose-700 text-[10px] font-black rounded-full">
-                                <XCircle className="w-3 h-3" /> SALAH
+                                <XCircle className="w-3.5 h-3.5" /> SALAH
                               </span>
                             )}
 
@@ -890,7 +913,7 @@ export default function LiveLeaderboard() {
                             ) : (
                               <div>
                                 <p className="text-sm font-bold text-indigo-700 whitespace-pre-wrap leading-relaxed">
-                                  {correctKey}
+                                    {correctKey}
                                 </p>
                                 {(() => {
                                   const pts = Number(q.options?.points?.correct ?? examConfig?.correct_point ?? 4);
@@ -919,7 +942,6 @@ export default function LiveLeaderboard() {
                                 .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
                                 .map(([key, val]) => {
                                   const isUserSelected = String(userAnswer).toUpperCase() === key.toUpperCase();
-                                  
                                   let isOptCorrect = false;
                                   let pointVal = 0;
                                   if (q.options?.points) {
@@ -1017,12 +1039,113 @@ export default function LiveLeaderboard() {
                         )}
                       </div>
                     );
-                  });
-                })()
-              )}
-            </div>
+                  })()
+                )}
+              </div>
 
-            {/* Footer Modal */}
+              {/* Kolom Kanan: Peta Soal / Navigasi Grid Angka */}
+              {!reviewLoading && (() => {
+                const filtered = getFilteredQuestions();
+                if (filtered.length === 0) return null;
+                return (
+                  <div className="w-full lg:w-64 bg-slate-50 border-l border-gray-100 p-5 overflow-y-auto flex flex-col flex-shrink-0">
+                    <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest mb-4 flex items-center gap-1.5">
+                      <ClipboardList className="w-4 h-4 text-gray-500" /> Peta Soal Peserta
+                    </h3>
+                    <div className="grid grid-cols-5 gap-2">
+                      {filtered.map((qItem, i) => {
+                        const qType = qItem.options?.type || 'pg';
+                        const userAnswer = selectedAttempt.answers?.[qItem.id];
+                        const correctKey = qItem.correct_answer || qItem.answer || '';
+                        const isEmpty = !userAnswer;
+
+                        let isCorrect = false;
+                        if (qType === 'isian') {
+                          const correctAnswers = String(correctKey).toUpperCase().split('|').map(x => x.trim());
+                          isCorrect = !!userAnswer && correctAnswers.includes(String(userAnswer).trim().toUpperCase());
+                        } else if (qType === 'essay') {
+                          isCorrect = false;
+                        } else {
+                          if (qItem.options?.points) {
+                            const pts = qItem.options.points[String(userAnswer).toUpperCase()] ?? 0;
+                            isCorrect = pts > 0;
+                          } else {
+                            isCorrect = !!userAnswer && (
+                              String(userAnswer).trim().toUpperCase() === String(correctKey).trim().toUpperCase() ||
+                              (String(correctKey).length > 1 && String(correctKey).toUpperCase().includes(String(userAnswer).trim().toUpperCase()))
+                            );
+                          }
+                        }
+
+                        // Style mapping:
+                        // - Active: Border ring-2 ring-indigo-600
+                        // - Essay Belum Dinilai: Amber
+                        // - Benar: Green
+                        // - Salah: Red
+                        // - Kosong: Gray
+                        const isCurrent = i === activeReviewIndex;
+                        const isEssayUnresolved = qType === 'essay' && userAnswer && selectedAttempt.answers?.essay_grades?.[qItem.id] === undefined;
+
+                        let btnStyle = "bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200";
+                        if (isEssayUnresolved) {
+                          btnStyle = "bg-amber-500 text-white border-amber-600 shadow-sm";
+                        } else if (qType === 'essay') {
+                          btnStyle = "bg-sky-500 text-white border-sky-600 shadow-sm"; // Essay sudah dinilai
+                        } else if (isEmpty) {
+                          btnStyle = "bg-gray-200 text-gray-400 border-gray-300 shadow-sm";
+                        } else if (isCorrect) {
+                          btnStyle = "bg-emerald-500 text-white border-emerald-600 shadow-sm";
+                        } else {
+                          btnStyle = "bg-rose-500 text-white border-rose-600 shadow-sm";
+                        }
+
+                        if (isCurrent) {
+                          btnStyle += " scale-110 ring-2 ring-offset-2 ring-indigo-600 z-10 font-black";
+                        }
+
+                        return (
+                          <button
+                            key={qItem.id}
+                            onClick={() => setActiveReviewIndex(i)}
+                            className={`w-full aspect-square rounded-xl flex items-center justify-center text-[10px] font-black transition-all border-2 ${btnStyle}`}
+                            title={`Soal ${i + 1} (${qType.toUpperCase()})`}
+                          >
+                            {i + 1}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Legenda Warna */}
+                    <div className="mt-8 pt-4 border-t border-gray-200 space-y-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                      <p className="text-[9px] font-black text-gray-400 mb-1">Legenda Warna:</p>
+                      <div className="flex items-center gap-2">
+                        <span className="w-3.5 h-3.5 bg-emerald-500 rounded border border-emerald-600 shrink-0"></span>
+                        <span>Benar</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-3.5 h-3.5 bg-rose-500 rounded border border-rose-600 shrink-0"></span>
+                        <span>Salah</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-3.5 h-3.5 bg-amber-500 rounded border border-amber-600 shrink-0"></span>
+                        <span>Essay Review</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-3.5 h-3.5 bg-sky-500 rounded border border-sky-600 shrink-0"></span>
+                        <span>Essay Dinilai</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-3.5 h-3.5 bg-gray-200 rounded border border-gray-300 shrink-0"></span>
+                        <span>Kosong</span>
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })()}
+
+            </div>            {/* Footer Modal */}
             <div className="bg-white px-8 py-4 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 flex-shrink-0">
               {/* Prev / Next Slider Navigation Controls */}
               {!reviewLoading && (() => {
