@@ -376,24 +376,7 @@ export default function LiveLeaderboard() {
   });
 
   const downloadCSV = () => {
-    if (attempts.length === 0) return;
-    const headers = ['Peringkat', 'ID Peserta', 'Skor', 'Jumlah Pelanggaran', 'Terakhir Update'];
-    // Gunakan rank asli dari attempts (bukan filtered index)
-    const rows = filteredAttempts.map((item) => {
-      const realRank = attempts.findIndex(a => a.id === item.id) + 1;
-      const displayScore = checkHasUngradedEssay(item) ? 'Ditinjau' : (item.score ?? 0);
-      return [realRank, item.user_id, displayScore,
-        item.violations_count, new Date(item.updated_at).toLocaleTimeString()];
-    });
-    // \uFEFF = BOM karakter asli untuk Excel UTF-8
-    const csvContent = "\uFEFF" + headers.join(',') + "\n" + rows.map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Leaderboard_NCC13_${examId.split('-')[0]}.csv`);
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    downloadDetailCSV();
   };
 
   // Export detail: per question answer correctness
