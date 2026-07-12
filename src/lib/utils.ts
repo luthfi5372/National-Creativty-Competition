@@ -31,10 +31,9 @@ export const generateTicketCode = (id: number | string): string => {
   const numId = typeof id === "number" ? id : parseInt(id, 10);
 
   if (!isNaN(numId)) {
-    // ID integer: pakai formula LCG primer
-    seed = (numId * 6364136223846793005 + 1442695040888963407) >>> 0;
-    seed = (seed ^ (seed >>> 16)) >>> 0;
-    seed = (seed * 1793 + 4821) % 2147483647;
+    // Modular multiplication bijection: guaranteed 1-to-1 map (zero collisions)
+    // 3512953 is odd, hence coprime to 32^6 (2^30).
+    seed = (numId * 3512953 + 1234567) % 1073741824;
   } else {
     // ID string UUID: hash djb2 yang dimodifikasi
     let hash = 5381;
@@ -43,15 +42,16 @@ export const generateTicketCode = (id: number | string): string => {
       hash = ((hash << 5) + hash) ^ strId.charCodeAt(i);
       hash = hash >>> 0; // pastikan unsigned 32-bit
     }
-    seed = hash;
+    seed = hash % 1073741824;
   }
 
-  // Generate 6 karakter dengan LCG deterministik
+  // Generate 6 karakter dengan pemetaan base-32 deterministik dari seed
   let result = "";
-  let s = seed;
+  let tempSeed = seed;
   for (let i = 0; i < 6; i++) {
-    s = (s * 9301 + 49297) % 233280;
-    result += charPool[Math.floor((s / 233280) * charPool.length)];
+    const idx = tempSeed % charPool.length;
+    result += charPool[idx];
+    tempSeed = Math.floor(tempSeed / charPool.length);
   }
 
   return result;

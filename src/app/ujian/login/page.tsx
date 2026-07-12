@@ -197,13 +197,26 @@ export default function ParticipantLogin() {
         setLoading(false); return;
       }
 
+      // Determine the correct ticket code to store (prefer custom ticket id if available)
+      let finalTicketCode = "";
+      if (matchedUser.notes) {
+        try {
+          const notesObj = JSON.parse(matchedUser.notes);
+          if (notesObj.custom_ticket_id) {
+            finalTicketCode = notesObj.custom_ticket_id.toUpperCase();
+          }
+        } catch (e) {}
+      }
+      if (!finalTicketCode) {
+        finalTicketCode = `NCC-${generateTicketCode(matchedUser.id)}`;
+      }
+
       // ─── LANGKAH 7: Sukses! Simpan sesi dan masuk ────────────
       localStorage.setItem('ncc_user', JSON.stringify({
         ...matchedUser,
         active_exam_id: matchedExam.id,
         active_exam_title: matchedExam.title,
-        // Simpan ID Tiket yang sudah terverifikasi untuk referensi
-        ticket_code: `NCC-${generateTicketCode(matchedUser.id)}`
+        ticket_code: finalTicketCode
       }));
       router.push('/ujian/dashboard');
 
