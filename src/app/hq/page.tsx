@@ -1941,6 +1941,17 @@ function ModernHQDashboardContent() {
 
   // --- MEMORI MODAL DELETE (UPGRADED) ---
   const [deleteModal, setDeleteModal] = useState({ show: false, id: null, userId: null, name: "" });
+  const [ticketModal, setTicketModal] = useState<{
+    show: boolean;
+    entry: any;
+    currentTicketCode: string;
+    customTicketId: string;
+  }>({
+    show: false,
+    entry: null,
+    currentTicketCode: "",
+    customTicketId: "",
+  });
 
   // --- MEMORI BULK DELETE (HAPUS BANYAK SEKALIGUS) ---
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
@@ -2620,7 +2631,7 @@ function ModernHQDashboardContent() {
   };
 
   // --- KUSTOM / EDIT ID TIKET PESERTA ---
-  const handleEditCustomTicket = async (entry: any) => {
+  const handleEditCustomTicket = (entry: any) => {
     if (!entry) return;
     
     let currentCustomId = "";
@@ -2631,14 +2642,19 @@ function ModernHQDashboardContent() {
       } catch (e) {}
     }
 
-    const newCustomId = prompt(
-      `Ubah ID Tiket Kustom untuk: ${entry.full_name || "Peserta"}\nID Tiket Saat Ini: ${getEntryTicketCode(entry)}\n\nMasukkan ID Tiket Kustom baru (atau kosongkan untuk menggunakan ID otomatis):`,
-      currentCustomId
-    );
+    setTicketModal({
+      show: true,
+      entry,
+      currentTicketCode: getEntryTicketCode(entry),
+      customTicketId: currentCustomId,
+    });
+  };
 
-    if (newCustomId === null) return;
+  const handleSaveCustomTicket = async () => {
+    const { entry, customTicketId } = ticketModal;
+    if (!entry) return;
 
-    const cleanNewId = newCustomId.trim().toUpperCase();
+    const cleanNewId = customTicketId.trim().toUpperCase();
 
     if (cleanNewId) {
       const duplicate = realEntries.find((e: any) => {
@@ -2691,6 +2707,7 @@ function ModernHQDashboardContent() {
       }
 
       showToast(`ID Tiket untuk ${entry.full_name || "Peserta"} berhasil diperbarui!`, "success");
+      setTicketModal(prev => ({ ...prev, show: false }));
     } catch (err: any) {
       console.error("Gagal memperbarui ID Tiket Kustom:", err);
       showToast(`Gagal memperbarui ID Tiket: ${err.message || err}`, "error");
@@ -6929,6 +6946,94 @@ function ModernHQDashboardContent() {
           <button onClick={() => setToast({ ...toast, show: false })} className="ml-auto text-slate-300 hover:text-slate-500 transition-colors">
             <X size={16} />
           </button>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 🎫 MODAL KUSTOM ID TIKET (INTERAKTIF & PREMIUM) */}
+      {/* ========================================================= */}
+      <div className={`fixed inset-0 z-[150] flex items-center justify-center p-4 transition-all duration-300 ${ticketModal.show ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        {/* Latar Belakang Gelap Glassmorphism */}
+        <div className="absolute inset-0 bg-slate-900/65 backdrop-blur-sm" onClick={() => setTicketModal(prev => ({ ...prev, show: false }))}></div>
+        
+        {/* Kotak Modal */}
+        <div className={`bg-white border border-slate-100 shadow-2xl rounded-[2.5rem] p-8 max-w-md w-full relative transition-all duration-300 transform ${ticketModal.show ? 'scale-100 translate-y-0' : 'scale-[0.95] translate-y-4'}`}>
+          
+          {/* Close button */}
+          <button 
+            onClick={() => setTicketModal(prev => ({ ...prev, show: false }))}
+            className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-650 hover:bg-slate-50 rounded-full transition-colors"
+          >
+            <X size={18} />
+          </button>
+
+          <div className="w-16 h-16 bg-indigo-50 text-indigo-650 rounded-[1.25rem] flex items-center justify-center mb-5 shadow-inner border border-indigo-100/50">
+            <Pencil size={24} />
+          </div>
+
+          <h3 className="text-xl font-black text-slate-800 mb-1 tracking-tight">Kustom ID Tiket</h3>
+          <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-6">
+            Peserta: <span className="text-slate-650 normal-case font-extrabold">{ticketModal.entry?.full_name || "Peserta Anonim"}</span>
+          </p>
+
+          <div className="space-y-4 mb-6">
+            {/* Info Status Saat Ini */}
+            <div className="bg-slate-50 border border-slate-150/50 p-4 rounded-2xl flex items-center justify-between">
+              <div>
+                <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">ID Tiket Aktif</p>
+                <p className="text-sm font-black text-slate-700 mt-0.5">{ticketModal.currentTicketCode}</p>
+              </div>
+              <span className="px-2 py-0.5 text-[9px] font-bold text-slate-500 bg-slate-200/60 rounded">
+                NCC Default
+              </span>
+            </div>
+
+            {/* Input Form */}
+            <div>
+              <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">ID Tiket Baru</label>
+              <div className="relative">
+                <input 
+                  type="text"
+                  value={ticketModal.customTicketId}
+                  onChange={(e) => setTicketModal(prev => ({ ...prev, customTicketId: e.target.value }))}
+                  placeholder="Contoh: 222SYB"
+                  className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl px-4.5 py-3.5 pr-20 text-sm font-extrabold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-150 transition-all uppercase tracking-wider"
+                />
+                <span className="absolute right-4.5 top-1/2 -translate-y-1/2 text-[10px] font-black text-indigo-650 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1">
+                  KUSTOM
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
+                Biarkan kosong jika ingin kembali menggunakan ID otomatis sistem (NCC-hash).
+              </p>
+            </div>
+
+            {/* Live Preview Card */}
+            {ticketModal.customTicketId.trim() && (
+              <div className="bg-indigo-50/40 border border-indigo-100/50 p-4 rounded-2xl">
+                <p className="text-[9px] text-indigo-500 font-black uppercase tracking-wider mb-1">Pratinjau Kode Akhir</p>
+                <span className="text-base font-black text-indigo-750 tracking-wider">
+                  NCC-{ticketModal.customTicketId.trim().toUpperCase()}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-4">
+            <button 
+              onClick={() => setTicketModal(prev => ({ ...prev, show: false }))} 
+              className="flex-1 py-3.5 rounded-2xl font-bold text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 active:scale-95 transition-all text-sm"
+            >
+              Batalkan
+            </button>
+            <button 
+              onClick={handleSaveCustomTicket}
+              className="flex-1 py-3.5 rounded-2xl font-bold text-white bg-indigo-650 hover:bg-indigo-700 shadow-lg shadow-indigo-100 active:scale-95 transition-all text-sm"
+            >
+              Simpan Kode
+            </button>
+          </div>
+
         </div>
       </div>
 
