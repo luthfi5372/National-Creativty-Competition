@@ -77,7 +77,7 @@ export default function EditorBankSoal() {
   };
 
   const handleAddOption = () => {
-    if (visibleOptions.length >= 10) return;
+    if (visibleOptions.length >= 25) return;
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const nextLetter = alphabet[visibleOptions.length];
     setVisibleOptions([...visibleOptions, nextLetter]);
@@ -726,7 +726,7 @@ export default function EditorBankSoal() {
                   <button
                     type="button"
                     onClick={handleAddOption}
-                    disabled={visibleOptions.length >= 10}
+                    disabled={visibleOptions.length >= 25}
                     className="flex-grow py-2 px-3 border border-indigo-200 bg-indigo-50/30 hover:bg-indigo-50 text-[#5145cd] text-xs font-bold rounded-xl transition-all disabled:opacity-50"
                   >
                     + Tambah Opsi Pilihan
