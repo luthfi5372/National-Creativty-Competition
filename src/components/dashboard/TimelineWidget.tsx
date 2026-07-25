@@ -210,8 +210,6 @@ export default function TimelineWidget({ userCategory, userStatus, notes, global
 
   // Helper untuk menentukan state item dinamis
   const getItemState = (item: any, waveActive: boolean) => {
-    if (!waveActive) return "locked";
-    
     const isAllowedByProgress = getItemActiveState(item.label);
     if (!isAllowedByProgress) return "locked";
 
@@ -221,34 +219,44 @@ export default function TimelineWidget({ userCategory, userStatus, notes, global
     const startDate = item.start ? new Date(item.start) : null;
     const endDate = item.end ? new Date(item.end) : null;
 
-    if (!startDate && !endDate) {
+    // Jika item memiliki tanggal, gunakan logika berbasis tanggal (prioritas utama)
+    if (startDate || endDate) {
+      const start = startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null;
+      const end = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null;
+
+      // Khusus Pendaftaran: jika sudah verified = completed, jika dalam range = active
       const label = item.label.toLowerCase();
-      if (label.includes('tahap iii') || label.includes('grand final') || label.includes('final')) {
-        return userProgress === 3 ? "active" : userProgress > 3 ? "completed" : "locked";
+      if (label.includes('pendaftaran') || label.includes('registrasi')) {
+        if (userStatus === 'Verified') return 'completed';
+        // Cek apakah masih dalam periode pendaftaran
+        if (start && today < start) return 'locked';
+        if (end && today > end) return 'completed';
+        return 'active';
       }
-      if (label.includes('tahap ii') || label.includes('fullpaper') || label.includes('seleksi 2') || label.includes('semi final')) {
-        return userProgress === 2 ? "active" : userProgress > 2 ? "completed" : "locked";
+
+      // Item umum dengan tanggal
+      if (start && today < start) {
+        return "locked";
       }
-      return userProgress === 1 ? "active" : userProgress > 1 ? "completed" : "locked";
+
+      if (end && today > end) {
+        return "completed";
+      }
+
+      return "active"; // In Progress (tanggal hari ini dalam rentang)
     }
 
-    const start = startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null;
-    const end = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null;
+    // Jika item TIDAK memiliki tanggal, gunakan waveActive sebagai fallback
+    if (!waveActive) return "locked";
 
     const label = item.label.toLowerCase();
-    if (label.includes('pendaftaran') || label.includes('registrasi')) {
-      return userStatus === 'Verified' ? 'completed' : 'active';
+    if (label.includes('tahap iii') || label.includes('grand final') || label.includes('final')) {
+      return userProgress === 3 ? "active" : userProgress > 3 ? "completed" : "locked";
     }
-
-    if (start && today < start) {
-      return "locked";
+    if (label.includes('tahap ii') || label.includes('fullpaper') || label.includes('seleksi 2') || label.includes('semi final')) {
+      return userProgress === 2 ? "active" : userProgress > 2 ? "completed" : "locked";
     }
-
-    if (end && today > end) {
-      return "completed";
-    }
-
-    return "active"; // In Progress
+    return userProgress === 1 ? "active" : userProgress > 1 ? "completed" : "locked";
   };
 
   // Helper untuk merender style gamifikasi kartu
