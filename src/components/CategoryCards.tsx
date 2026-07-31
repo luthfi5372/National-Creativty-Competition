@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Mic, BookOpen, Sun, Atom, ArrowRight } from "lucide-react";
+import { Mic, BookOpen, Sun, Atom, ArrowRight, FileText } from "lucide-react";
 
 const categories = [
   {
@@ -12,6 +12,7 @@ const categories = [
       "Tunjukkan kemampuan berbicara di depan publik. Sampaikan gagasan inovatif dengan penuh percaya diri dan retorika yang memukau.",
     color: "text-red-500",
     bg: "bg-red-50",
+    juknis: "/juknis/juknis-speech.pdf",
   },
   {
     id: "lkti",
@@ -21,6 +22,7 @@ const categories = [
       "Lomba Karya Tulis Ilmiah — wadah bagi peneliti muda untuk mempresentasikan temuan inovatif dan solusi berbasis rigor akademik.",
     color: "text-emerald-500",
     bg: "bg-emerald-50",
+    juknis: "/juknis/juknis-lkti.pdf",
   },
   {
     id: "mtq",
@@ -30,6 +32,7 @@ const categories = [
       "Musabaqah Tilawatil Quran — kompetisi seni baca Al-Quran, menampilkan keindahan tajwid dan kedalaman spiritual.",
     color: "text-amber-500",
     bg: "bg-amber-50",
+    juknis: "/juknis/juknis-mtq.pdf",
   },
   {
     id: "mipa",
@@ -39,6 +42,7 @@ const categories = [
       "Tantangan akademik tingkat tinggi di bidang Matematika dan Ilmu Pengetahuan Alam. Uji kemampuan analitis dan problem-solving.",
     color: "text-indigo-500",
     bg: "bg-indigo-50",
+    juknis: "/juknis/juknis-olimpiade-mipa.pdf",
   },
 ];
 
@@ -94,10 +98,22 @@ export default function CategoryCards() {
                 {cat.description}
               </p>
 
-              {/* Action link */}
-              <div className={`inline-flex items-center gap-2 text-sm font-medium transition-all duration-300 group-hover:gap-3 ${cat.color}`}>
-                <span>Selengkapnya</span>
-                <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+              {/* Action links */}
+              <div className="flex items-center gap-4 w-full flex-wrap">
+                <a
+                  href={cat.juknis}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all border border-slate-200 hover:border-slate-300"
+                >
+                  <FileText size={14} />
+                  <span>Lihat Juknis</span>
+                </a>
+                <div className={`inline-flex items-center gap-2 text-sm font-medium transition-all duration-300 group-hover:gap-3 ${cat.color}`}>
+                  <span>Selengkapnya</span>
+                  <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+                </div>
               </div>
             </motion.div>
           );
