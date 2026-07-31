@@ -1034,31 +1034,59 @@ export default function StatusCards({
 
 
       <div className="grid grid-cols-1 gap-4">
-        {[
-          { label: "Buku Panduan", sub: "Syarat & Ketentuan Lomba (PDF)", icon: BookOpen, color: "blue" },
-          { label: "Twibbon Resmi", sub: "Unduh aset kampanye IG", icon: ImageIcon, color: "purple" },
-          { label: "Hubungi Panitia", sub: "Bantuan via WhatsApp", icon: MessageCircle, color: "green" },
-        ].map((item, i) => (
-          <a key={i} href="#" className="flex items-center gap-4 p-5 bg-white border border-slate-200 hover:border-indigo-300 rounded-2xl transition-all shadow-sm group relative overflow-hidden">
-            {item.label === "Buku Panduan" && (
-              <div className="absolute top-0 left-0 w-full h-1 bg-slate-50 overflow-hidden">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: "100%" }}
-                  transition={{ duration: 2, delay: 1 }}
-                  className="h-full bg-gradient-to-r from-blue-400 to-indigo-600"
-                />
+        {(() => {
+          // Map kategori lomba ke file juknis PDF
+          const getJuknisUrl = () => {
+            const cat = (userEntry?.competition_type || userEntry?.category || '').toLowerCase();
+            if (cat.includes('lkti')) return '/juknis/juknis-lkti.pdf';
+            if (cat.includes('mipa') || cat.includes('olimpiade')) return '/juknis/juknis-olimpiade-mipa.pdf';
+            if (cat.includes('speech')) return '/juknis/juknis-speech.pdf';
+            if (cat.includes('mtq')) return '/juknis/juknis-mtq.pdf';
+            return null;
+          };
+          const juknisUrl = getJuknisUrl();
+          const juknisLabel = userEntry?.competition_type || userEntry?.category || 'Lomba';
+
+          const items = [
+            { 
+              label: "Buku Panduan", 
+              sub: juknisUrl ? `Juknis ${juknisLabel} (PDF)` : "Syarat & Ketentuan Lomba (PDF)", 
+              icon: BookOpen, 
+              color: "blue",
+              href: juknisUrl || "#"
+            },
+            { label: "Twibbon Resmi", sub: "Unduh aset kampanye IG", icon: ImageIcon, color: "purple", href: "#" },
+            { label: "Hubungi Panitia", sub: "Bantuan via WhatsApp", icon: MessageCircle, color: "green", href: "#" },
+          ];
+
+          return items.map((item, i) => (
+            <a 
+              key={i} 
+              href={item.href} 
+              target={item.href !== '#' ? '_blank' : undefined}
+              rel={item.href !== '#' ? 'noopener noreferrer' : undefined}
+              className="flex items-center gap-4 p-5 bg-white border border-slate-200 hover:border-indigo-300 rounded-2xl transition-all shadow-sm group relative overflow-hidden"
+            >
+              {item.label === "Buku Panduan" && (
+                <div className="absolute top-0 left-0 w-full h-1 bg-slate-50 overflow-hidden">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: "100%" }}
+                    transition={{ duration: 2, delay: 1 }}
+                    className="h-full bg-gradient-to-r from-blue-400 to-indigo-600"
+                  />
+                </div>
+              )}
+              <div className={`w-12 h-12 bg-${item.color}-100 text-${item.color}-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all`}>
+                <item.icon size={24} />
               </div>
-            )}
-            <div className={`w-12 h-12 bg-${item.color}-100 text-${item.color}-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all`}>
-              <item.icon size={24} />
-            </div>
-            <div>
-              <h4 className="font-bold text-slate-800 text-sm">{item.label}</h4>
-              <p className="text-[11px] text-slate-400 mt-0.5">{item.sub}</p>
-            </div>
-          </a>
-        ))}
+              <div>
+                <h4 className="font-bold text-slate-800 text-sm">{item.label}</h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">{item.sub}</p>
+              </div>
+            </a>
+          ));
+        })()}
 
         {/* ── DYNAMIC REGISTRATION CARD INTEGRATED WITH ADMIN GATE ── */}
         {!userEntry ? (
