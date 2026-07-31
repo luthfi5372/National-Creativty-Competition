@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Mail, MapPin, Phone, Hash, Link as LinkIcon, AtSign } from "lucide-react";
+import { Mail, MapPin, Phone, Hash, Link as LinkIcon, AtSign, MessageCircle } from "lucide-react";
 import { fetchSiteSettings } from "@/lib/supabase/service";
 
 export default function Footer() {
@@ -114,6 +114,41 @@ export default function Footer() {
                 );
               })}
             </div>
+          </div>
+        </div>
+
+        {/* Contact Person WhatsApp Buttons */}
+        <div className="mt-10 pt-8 border-t border-slate-100">
+          <h4
+            className="text-sm font-bold text-slate-900 mb-4 uppercase tracking-wider"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Contact Person (CP)
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { category: "LKTI", name: "Rizki Yudha Sentika, M.Pd", phone: "6285746460644" },
+              { category: "Olimpiade MIPA", name: "Yudha Kristiawan, M.Pd", phone: "6285736274033" },
+              { category: "Olimpiade MIPA", name: "Putri Setyaningati N, S.Pd", phone: "6285730034516" },
+              { category: "Speech Contest", name: "Rizkia Putri Perdana, S.Pd", phone: "6285649603868" },
+              { category: "MTQ", name: "Herina Jum'atin A, S.Pd.I. M.Pd", phone: "6281233882731" },
+            ].map((cp, i) => (
+              <a
+                key={i}
+                href={`https://wa.me/${cp.phone}?text=${encodeURIComponent(`Assalamualaikum, saya ingin bertanya mengenai lomba ${cp.category} NCC 13th.`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 bg-green-50 hover:bg-green-100 border border-green-200 hover:border-green-300 rounded-xl transition-all group"
+              >
+                <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                  <MessageCircle size={14} className="text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-green-700 uppercase tracking-wider">{cp.category}</p>
+                  <p className="text-xs text-slate-600 font-medium truncate">{cp.name}</p>
+                </div>
+              </a>
+            ))}
           </div>
         </div>
 
