@@ -1047,6 +1047,20 @@ export default function StatusCards({
           const juknisUrl = getJuknisUrl();
           const juknisLabel = userEntry?.competition_type || userEntry?.category || 'Lomba';
 
+          // Map kategori lomba ke CP WhatsApp (dari Juknis resmi)
+          const getWhatsAppCP = () => {
+            const cat = (userEntry?.competition_type || userEntry?.category || '').toLowerCase();
+            if (cat.includes('lkti')) return { name: 'Rizki Yudha Sentika, M.Pd', phone: '6285746460644' };
+            if (cat.includes('mipa') || cat.includes('olimpiade')) return { name: 'Yudha Kristiawan, M.Pd', phone: '6285736274033' };
+            if (cat.includes('speech')) return { name: 'Rizkia Putri Perdana, S.Pd', phone: '6285649603868' };
+            if (cat.includes('mtq')) return { name: 'Herina Jum\'atin Ayuningrum, S.Pd.I. M.Pd', phone: '6281233882731' };
+            return null;
+          };
+          const cpInfo = getWhatsAppCP();
+          const waUrl = cpInfo 
+            ? `https://wa.me/${cpInfo.phone}?text=${encodeURIComponent(`Assalamualaikum, saya peserta ${juknisLabel} NCC 13th. Saya ingin bertanya mengenai informasi lomba.`)}`
+            : '#';
+
           const items = [
             { 
               label: "Buku Panduan", 
@@ -1056,7 +1070,7 @@ export default function StatusCards({
               href: juknisUrl || "#"
             },
             { label: "Twibbon Resmi", sub: "Unduh aset kampanye IG", icon: ImageIcon, color: "purple", href: "#" },
-            { label: "Hubungi Panitia", sub: "Bantuan via WhatsApp", icon: MessageCircle, color: "green", href: "#" },
+            { label: "Hubungi Panitia", sub: cpInfo ? `CP: ${cpInfo.name}` : "Bantuan via WhatsApp", icon: MessageCircle, color: "green", href: waUrl },
           ];
 
           return items.map((item, i) => (
