@@ -224,26 +224,18 @@ export default function TimelineWidget({ userCategory, userStatus, notes, global
       const start = startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) : null;
       const end = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null;
 
-      // Khusus Pendaftaran: jika sudah verified = completed, jika dalam range = active
-      const label = item.label.toLowerCase();
-      if (label.includes('pendaftaran') || label.includes('registrasi')) {
-        if (userStatus === 'Verified') return 'completed';
-        // Cek apakah masih dalam periode pendaftaran
-        if (start && today < start) return 'locked';
-        if (end && today > end) return 'completed';
-        return 'active';
-      }
-
-      // Item umum dengan tanggal
+      // 1. Belum mulai → terkunci
       if (start && today < start) {
         return "locked";
       }
 
+      // 2. Sudah lewat → selesai
       if (end && today > end) {
         return "completed";
       }
 
-      return "active"; // In Progress (tanggal hari ini dalam rentang)
+      // 3. Dalam rentang tanggal → sedang berlangsung (active)
+      return "active";
     }
 
     // Jika item TIDAK memiliki tanggal, gunakan waveActive sebagai fallback
