@@ -1052,7 +1052,7 @@ export default function StatusCards({
             const cat = (userEntry?.competition_type || userEntry?.category || '').toLowerCase();
             if (cat.includes('lkti')) return [{ name: 'Rizki Yudha Sentika, M.Pd', phone: '6285746460644' }];
             if (cat.includes('mipa') || cat.includes('olimpiade')) return [
-              { name: 'Yudha Kristiawan, M.Pd', phone: '6285736274033' },
+              { name: 'Yudha Kristiawan, M.Pd', phone: '6281331374833' },
               { name: 'Putri Setyaningati N, S.Pd', phone: '6285730034516' },
             ];
             if (cat.includes('speech')) return [{ name: 'Rizkia Putri Perdana, S.Pd', phone: '6285649603868' }];

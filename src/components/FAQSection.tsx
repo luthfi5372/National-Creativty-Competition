@@ -6,20 +6,16 @@ import { ChevronDown } from "lucide-react";
 
 const faqs = [
   {
-    q: "Berapa biaya pendaftaran minimum untuk LKTI?",
-    a: "Tidak ada minimum biaya. Kami menerapkan sistem gelombang. Untuk Gelombang 1 biayanya Rp 50.000, sedangkan untuk Gelombang 2 adalah Rp 75.000. Harga berlaku untuk satu tim maksimal 3 anggota.",
+    q: "Apakah diperbolehkan bagi peserta Gelombang Pertama untuk mendaftar kembali di Gelombang Kedua apabila dinyatakan tidak lolos di Gelombang Pertama?",
+    a: "Iya, bagi peserta Gelombang Pertama apabila dinyatakan tidak lolos diperkenankan untuk mengikuti Gelombang Kedua.",
   },
   {
-    q: "Bagaimana cara melakukan registrasi sistem di Platform ini?",
-    a: "Anda bisa langsung mengklik tombol pendaftaran (Daftar Tim) lalu mengisi formulir yang terhubung dengan Autentikasi Google atau Email. Semua anggota tim terintegrasi dalam 1 *Dashboard* untuk mengunggah karya.",
+    q: "Apakah pendaftaran NCC berbayar?",
+    a: "Untuk pendaftaran NCC gratis, tetapi apabila peserta dinyatakan lolos ke Tahap 2 dikenakan pembayaran sebesar Rp 50.000.",
   },
   {
-    q: "Apakah siswa SMA bisa mengikuti Lomba Speech Contest?",
-    a: "Tentu. NCC edisi kali ini membagi braket perlombaan menjadi kategori Universitas (PT) dan kategori Pelajar (SMA/SMK Sederajat).",
-  },
-  {
-    q: "Apa saja kriteria format penilaian untuk Kategori MIPA?",
-    a: "Berbeda dengan babak tulis, babak penyisihan MIPA diselenggarakan otomatis lewat bank soal daring di situs web kami, sementara finalis yang lolos akan diundang secara luring (On-site).",
+    q: "Apakah ada ganti untuk biaya tiket transportasi?",
+    a: "Tidak ada, namun hanya terdapat subsidi transportasi yang disesuaikan dengan region (wilayah) masing-masing.",
   },
 ];
 

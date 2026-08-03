@@ -128,7 +128,7 @@ export default function Footer() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { category: "LKTI", name: "Rizki Yudha Sentika, M.Pd", phone: "6285746460644" },
-              { category: "Olimpiade MIPA", name: "Yudha Kristiawan, M.Pd", phone: "6285736274033" },
+              { category: "Olimpiade MIPA", name: "Yudha Kristiawan, M.Pd", phone: "6281331374833" },
               { category: "Olimpiade MIPA", name: "Putri Setyaningati N, S.Pd", phone: "6285730034516" },
               { category: "Speech Contest", name: "Rizkia Putri Perdana, S.Pd", phone: "6285649603868" },
               { category: "MTQ", name: "Herina Jum'atin A, S.Pd.I. M.Pd", phone: "6281233882731" },
