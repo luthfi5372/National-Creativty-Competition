@@ -17,6 +17,10 @@ const faqs = [
     q: "Apakah ada ganti untuk biaya tiket transportasi?",
     a: "Tidak ada, namun hanya terdapat subsidi transportasi yang disesuaikan dengan region (wilayah) masing-masing.",
   },
+  {
+    q: "Bagaimana mekanisme pengambilan juara untuk lomba MTQ?",
+    a: "Sesuai dengan Juknis MTQ, akan diambil 5 juara putra dan 5 juara putri. Masing-masing akan diseleksi dari peserta Semifinal MTQ (putra dan putri).",
+  },
 ];
 
 export default function FAQSection() {
