@@ -3161,10 +3161,10 @@ function ModernHQDashboardContent() {
 
   // --- 📥 FITUR 1: MESIN EKSPOR CSV CERDAS ---
   const handleExportCSV = () => {
-    // 1. Tentukan data mana yang mau di-ekspor (hanya yang Terverifikasi)
-    const dataToExport = realEntries.filter(e => e.payment_status === 'Verified');
+    // 1. Gunakan data yang sudah difilter sesuai tabel aktif (status, gelombang, kategori, pencarian)
+    const dataToExport = filteredEntries;
     
-    if (dataToExport.length === 0) return alert("Tidak ada data peserta terverifikasi untuk di-ekspor.");
+    if (dataToExport.length === 0) return alert("Tidak ada data peserta yang sesuai filter untuk di-ekspor.");
 
     // 2. Tentukan Header Kolom
     const headers = [
