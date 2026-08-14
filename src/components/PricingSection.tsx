@@ -20,6 +20,7 @@ const stats = [
     category: "Olimpiade MIPA",
     count: 0,
     icon: BookOpen,
+    image: "/guidebook-olimpiade.png",
     color: "text-blue-600",
     bgColor: "bg-blue-50",
     borderColor: "border-blue-100",
@@ -31,6 +32,7 @@ const stats = [
     category: "Speech Contest",
     count: 0,
     icon: Mic,
+    image: "/guidebook-speech.png",
     color: "text-emerald-600",
     bgColor: "bg-emerald-50",
     borderColor: "border-emerald-100",
@@ -42,6 +44,7 @@ const stats = [
     category: "LKTI Nasional",
     count: 0,
     icon: Medal,
+    image: "/guidebook-lkti.png",
     color: "text-purple-600",
     bgColor: "bg-purple-50",
     borderColor: "border-purple-100",
@@ -53,6 +56,7 @@ const stats = [
     category: "MTQ Nasional",
     count: 0,
     icon: Book,
+    image: "/guidebook-mtq.png",
     color: "text-amber-600",
     bgColor: "bg-amber-50",
     borderColor: "border-amber-100",
@@ -195,8 +199,8 @@ export default function StatsSection() {
               className={`relative rounded-3xl p-6 flex flex-col items-center text-center bg-white border ${stat.borderColor} shadow-sm hover:shadow-xl hover:shadow-indigo-50 transition-shadow cursor-default h-full`}
             >
               {/* Icon */}
-              <div className={`w-16 h-16 rounded-2xl ${stat.bgColor} flex items-center justify-center mb-6`}>
-                <LineDrawIcon icon={Icon} size={32} className={stat.color} delay={i * 0.15} />
+              <div className={`w-16 h-16 rounded-2xl ${stat.bgColor} flex items-center justify-center mb-6 overflow-hidden`}>
+                <img src={stat.image} alt={stat.category} className="w-12 h-12 object-contain drop-shadow-md" loading="lazy" />
               </div>
 
               {/* Title */}

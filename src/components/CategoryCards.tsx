@@ -8,6 +8,7 @@ const categories = [
     id: "speech",
     title: "SPEECH CONTEST",
     icon: Mic,
+    image: "/guidebook-speech.png",
     description:
       "Tunjukkan kemampuan berbicara di depan publik. Sampaikan gagasan inovatif dengan penuh percaya diri dan retorika yang memukau.",
     color: "text-red-500",
@@ -18,6 +19,7 @@ const categories = [
     id: "lkti",
     title: "LKTI",
     icon: BookOpen,
+    image: "/guidebook-lkti.png",
     description:
       "Lomba Karya Tulis Ilmiah — wadah bagi peneliti muda untuk mempresentasikan temuan inovatif dan solusi berbasis rigor akademik.",
     color: "text-emerald-500",
@@ -28,6 +30,7 @@ const categories = [
     id: "mtq",
     title: "MTQ",
     icon: Sun,
+    image: "/guidebook-mtq.png",
     description:
       "Musabaqah Tilawatil Quran — kompetisi seni baca Al-Quran, menampilkan keindahan tajwid dan kedalaman spiritual.",
     color: "text-amber-500",
@@ -38,6 +41,7 @@ const categories = [
     id: "mipa",
     title: "OLIMPIADE MIPA",
     icon: Atom,
+    image: "/guidebook-olimpiade.png",
     description:
       "Tantangan akademik tingkat tinggi di bidang Matematika dan Ilmu Pengetahuan Alam. Uji kemampuan analitis dan problem-solving.",
     color: "text-indigo-500",
@@ -84,8 +88,8 @@ export default function CategoryCards() {
               className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all group flex flex-col items-start text-left cursor-pointer"
             >
               {/* Icon container */}
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110 ${cat.bg}`}>
-                <Icon size={26} className={cat.color} />
+              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110 ${cat.bg} overflow-hidden`}>
+                <img src={cat.image} alt={cat.title} className="w-12 h-12 object-contain drop-shadow-md" loading="lazy" />
               </div>
 
               {/* Title */}
