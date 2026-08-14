@@ -81,7 +81,7 @@ export default function Footer() {
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-sm text-slate-500">
                 <Mail size={14} className="text-indigo-500" />
-                <span>{settings?.contact_email || "info@ncc2026.id"}</span>
+                <span>{settings?.contact_email || "nccsmadu1@gmail.com"}</span>
               </div>
               <div className="flex items-center gap-3 text-sm text-slate-500">
                 <Phone size={14} className="text-indigo-500" />
