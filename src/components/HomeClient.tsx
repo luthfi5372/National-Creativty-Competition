@@ -16,6 +16,7 @@ const IndonesiaMap = dynamic(() => import("@/components/IndonesiaMap"), { ssr: f
 const GallerySection = dynamic(() => import("@/components/GallerySection"), { ssr: false });
 const TimelineSection = dynamic(() => import("@/components/TimelineSection"), { ssr: false });
 const SpeedMonitor = dynamic(() => import("@/components/SpeedMonitor"), { ssr: false });
+const GuidebookPins = dynamic(() => import("@/components/GuidebookPins"), { ssr: false });
 
 export default function HomeClient() {
   return (
@@ -50,6 +51,10 @@ export default function HomeClient() {
 
           <section className="min-h-screen w-full py-24 flex items-center justify-center">
             <IndonesiaMap />
+          </section>
+
+          <section className="w-full">
+            <GuidebookPins />
           </section>
 
           <TimelineSection />
