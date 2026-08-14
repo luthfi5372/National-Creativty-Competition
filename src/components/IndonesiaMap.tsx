@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLiveStats } from "@/hooks/useLiveStats";
-import { Info, TrendingUp, Users, MousePointer2, Map as MapIcon, MapPin } from "lucide-react";
+import { Info, TrendingUp, Users, MousePointer2, Map as MapIcon, MapPin, FileText, Sparkles, ExternalLink, BookOpen } from "lucide-react";
 import * as d3 from "d3-geo";
 import geoData from "@/data/indonesia-simple.json";
 
@@ -143,6 +143,37 @@ class Particle {
     }
   }
 }
+
+const GUIDEBOOK_PINS = [
+  {
+    id: "mtq",
+    title: "MTQ",
+    subtitle: "Musabaqah Tilawatil Quran",
+    image: "/guidebook-mtq.png",
+    pdfUrl: "/juknis/juknis-mtq.pdf",
+  },
+  {
+    id: "lkti",
+    title: "LKTI",
+    subtitle: "Lomba Karya Tulis Ilmiah",
+    image: "/guidebook-lkti.png",
+    pdfUrl: "/juknis/juknis-lkti.pdf",
+  },
+  {
+    id: "speech",
+    title: "Speech Contest",
+    subtitle: "English Speech Competition",
+    image: "/guidebook-speech.png",
+    pdfUrl: "/juknis/juknis-speech.pdf",
+  },
+  {
+    id: "olimpiade",
+    title: "Olimpiade MIPA",
+    subtitle: "Matematika & IPA",
+    image: "/guidebook-olimpiade.png",
+    pdfUrl: "/juknis/juknis-olimpiade-mipa.pdf",
+  },
+];
 
 export default function IndonesiaMap() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -480,6 +511,70 @@ export default function IndonesiaMap() {
           </div>
 
         </div>
+
+        {/* ─── GUIDEBOOK BADGES / PINS SECTION ─── */}
+        <div className="mt-24 pt-16 border-t border-slate-200/80">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-200/60 mb-3">
+              <Sparkles size={12} className="animate-spin text-amber-500" /> Juknis Resmi Kompetisi
+            </div>
+            <h3 className="text-3xl sm:text-4xl font-bold text-slate-900 leading-tight">
+              Buku Panduan & <span className="text-amber-500">Juknis Lomba</span>
+            </h3>
+            <p className="text-slate-500 text-sm mt-4 leading-relaxed">
+              Klik pin lencana di bawah untuk langsung membuka Petunjuk Teknis (Juknis) resmi sesuai bidang lomba yang Anda ikuti.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+            {GUIDEBOOK_PINS.map((item, idx) => (
+              <motion.a
+                key={item.id}
+                href={item.pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.1, duration: 0.5 }}
+                whileHover={{ y: -8, scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                className="group relative flex flex-col items-center bg-white/70 backdrop-blur-md border border-slate-200/80 hover:border-amber-400/80 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-300 cursor-pointer"
+              >
+                {/* Glow behind badge */}
+                <div className="absolute top-10 w-28 h-28 bg-amber-300/20 rounded-full blur-2xl group-hover:bg-amber-400/35 transition-all duration-500 pointer-events-none" />
+
+                {/* Badge Image */}
+                <div className="relative w-28 h-28 sm:w-36 sm:h-36 mb-4 flex items-center justify-center">
+                  <img
+                    src={item.image}
+                    alt={`Lencana ${item.title}`}
+                    className="w-full h-full object-contain drop-shadow-md group-hover:drop-shadow-2xl group-hover:rotate-2 transition-all duration-300 relative z-10"
+                    loading="lazy"
+                  />
+                </div>
+
+                {/* Category Title */}
+                <h4 className="font-bold text-base sm:text-lg text-slate-900 group-hover:text-amber-600 transition-colors text-center"
+                    style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))" }}
+                >
+                  {item.title}
+                </h4>
+                <p className="text-xs text-slate-500 text-center mt-1 mb-4 font-medium">
+                  {item.subtitle}
+                </p>
+
+                {/* Button Action */}
+                <span className="mt-auto inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-50 group-hover:bg-amber-500 text-amber-700 group-hover:text-white border border-amber-200 group-hover:border-amber-500 text-xs font-bold rounded-xl transition-all duration-300 shadow-sm">
+                  <FileText size={13} />
+                  <span>Buka Juknis</span>
+                  <ExternalLink size={11} className="opacity-70 group-hover:opacity-100" />
+                </span>
+              </motion.a>
+            ))}
+          </div>
+        </div>
+
       </div>
     </section>
   );
