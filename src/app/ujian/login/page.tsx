@@ -142,7 +142,7 @@ export default function ParticipantLogin() {
       // ─── LANGKAH 5: Ambil Sesi Ujian Aktif ───────────────────
       const { data: exams, error: examsError } = await supabase
         .from('cbt_exams')
-        .select('id, title')
+        .select('id, title, token')
         .eq('is_active', true);
 
       if (examsError || !exams || exams.length === 0) {
@@ -150,7 +150,7 @@ export default function ParticipantLogin() {
         setLoading(false); return;
       }
 
-      // ─── LANGKAH 6: Validasi Rolling Token (10 Menit) ────────
+      // ─── LANGKAH 6: Validasi Token (Custom Token & Rolling Token 10 Menit) ────────
       const now = Math.floor(Date.now() / 1000);
       const interval10Min = 600;
       const currentInterval = Math.floor(now / interval10Min);
@@ -164,22 +164,30 @@ export default function ParticipantLogin() {
 
       for (const exam of exams) {
         let isMatched = false;
-        
-        for (const interval of targetIntervals) {
-          let expectedToken = "";
-          let idSum = 5381;
-          for (let i = 0; i < exam.id.length; i++) {
-            idSum = ((idSum * 33) ^ exam.id.charCodeAt(i)) >>> 0;
-          }
-          let seed = (idSum + interval) % 10000;
-          for (let i = 0; i < 6; i++) {
-            seed = (seed * 9301 + 49297) % 233280;
-            expectedToken += charPool[Math.floor((seed / 233280) * charPool.length)];
-          }
 
-          if (userToken === expectedToken) {
-            isMatched = true;
-            break;
+        // 1. Cek Custom Token Tetap (Jika diset oleh admin di DB)
+        if (exam.token && exam.token.trim().toUpperCase() === userToken) {
+          isMatched = true;
+        }
+
+        // 2. Cek Dynamic Rolling Token (Default TOTP 10-menit)
+        if (!isMatched) {
+          for (const interval of targetIntervals) {
+            let expectedToken = "";
+            let idSum = 5381;
+            for (let i = 0; i < exam.id.length; i++) {
+              idSum = ((idSum * 33) ^ exam.id.charCodeAt(i)) >>> 0;
+            }
+            let seed = (idSum + interval) % 10000;
+            for (let i = 0; i < 6; i++) {
+              seed = (seed * 9301 + 49297) % 233280;
+              expectedToken += charPool[Math.floor((seed / 233280) * charPool.length)];
+            }
+
+            if (userToken === expectedToken) {
+              isMatched = true;
+              break;
+            }
           }
         }
 

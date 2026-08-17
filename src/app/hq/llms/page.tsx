@@ -93,6 +93,7 @@ export default function IntegratedLLMSDashboard() {
     setIsSavingEdit(true);
     const { error } = await supabase.from('cbt_exams').update({
       title: editingSession.title,
+      token: editingSession.token ? editingSession.token.trim().toUpperCase() : null,
       duration_minutes: editingSession.duration_minutes,
       is_active: editingSession.is_active,
       shuffle_questions: editingSession.shuffle_questions ?? true,
@@ -361,7 +362,7 @@ export default function IntegratedLLMSDashboard() {
 
   const renderSessionCard = (session: any) => {
     const isActive = session.is_active;
-    const sessionToken = getLiveToken(session.id) || session.token || "------";
+    const sessionToken = (session.token && session.token.trim() !== '') ? session.token.trim().toUpperCase() : getLiveToken(session.id);
 
     // Scoring system badge content
     const scoringLabel = `DURASI: ${session.duration_minutes || 90} MENIT`;
@@ -936,22 +937,28 @@ export default function IntegratedLLMSDashboard() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Token Akses (Kustom)</label>
+                  <input type="text" value={editingSession.token || ''} onChange={e => setEditingSession({...editingSession, token: e.target.value.toUpperCase()})}
+                    className="w-full bg-slate-50 border border-slate-200/80 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-800 outline-none transition-all duration-200 placeholder-slate-300 uppercase tracking-widest"
+                    placeholder="KOSONG = TOKEN DINAMIS" />
+                </div>
+                <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Durasi (Menit)</label>
                   <input type="number" value={editingSession.duration_minutes || 90} onChange={e => setEditingSession({...editingSession, duration_minutes: parseInt(e.target.value)||90})}
                     className="w-full bg-slate-50 border border-slate-200/80 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-2xl px-4 py-3.5 text-sm font-semibold text-slate-800 outline-none transition-all duration-200" />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Status Sesi</label>
-                  <button onClick={() => setEditingSession({...editingSession, is_active: !editingSession.is_active})}
-                    className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border-2 ${
-                      editingSession.is_active 
-                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 border-transparent text-white shadow-md shadow-emerald-200/60' 
-                        : 'bg-slate-50 border-slate-200/80 text-slate-500'
-                    }`}>
-                    {editingSession.is_active ? <ToggleRight className="w-5 h-5 animate-pulse" /> : <ToggleLeft className="w-5 h-5" />}
-                    {editingSession.is_active ? 'Aktif (ON)' : 'Nonaktif (OFF)'}
-                  </button>
-                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Status Sesi</label>
+                <button onClick={() => setEditingSession({...editingSession, is_active: !editingSession.is_active})}
+                  className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border-2 ${
+                    editingSession.is_active 
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 border-transparent text-white shadow-md shadow-emerald-200/60' 
+                      : 'bg-slate-50 border-slate-200/80 text-slate-500'
+                  }`}>
+                  {editingSession.is_active ? <ToggleRight className="w-5 h-5 animate-pulse" /> : <ToggleLeft className="w-5 h-5" />}
+                  {editingSession.is_active ? 'Aktif (ON)' : 'Nonaktif (OFF)'}
+                </button>
               </div>
 
               {/* Toggle Acak Soal */}
@@ -1675,12 +1682,12 @@ function TokenRotationWidget() {
         <h3 className="text-xs font-black text-indigo-900 uppercase tracking-widest">Info Token</h3>
       </div>
       <p className="text-[11px] text-indigo-950/80 leading-relaxed font-medium">
-        Token berubah otomatis setiap <span className="font-extrabold text-indigo-600 bg-indigo-100/50 px-1.5 py-0.5 rounded border border-indigo-200/30">10 menit</span>. Bagikan ke peserta sebelum ujian dimulai.
+        Token sesi diatur kustom oleh admin atau berotasi otomatis setiap <span className="font-extrabold text-indigo-600 bg-indigo-100/50 px-1.5 py-0.5 rounded border border-indigo-200/30">10 menit</span>. Bagikan token aktif ke peserta sebelum ujian dimulai.
       </p>
       <div className="mt-4 flex items-center gap-2.5 p-3 bg-white/80 backdrop-blur-md border border-indigo-100/80 rounded-2xl shadow-sm">
         <Clock className="w-4 h-4 text-indigo-500 animate-spin" style={{ animationDuration: '6s' }} />
         <span className="text-xs font-mono text-indigo-900 font-extrabold tracking-wide">
-          Rotasi dalam: <span className="text-indigo-600 font-black">{Math.floor(countdown/60)}:{(countdown%60).toString().padStart(2,'0')}</span>
+          Rotasi dinamis dalam: <span className="text-indigo-600 font-black">{Math.floor(countdown/60)}:{(countdown%60).toString().padStart(2,'0')}</span>
         </span>
       </div>
     </div>
