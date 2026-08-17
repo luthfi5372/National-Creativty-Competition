@@ -36,7 +36,8 @@ export default function ExamRoom() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [doubtfulAnswers, setDoubtfulAnswers] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
-  const [timeLeft, setTimeLeft] = useState(5400); 
+  const [timeLeft, setTimeLeft] = useState(5400);
+  const [originalDurationSec, setOriginalDurationSec] = useState(5400);
 
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showCheatWarning, setShowCheatWarning] = useState(false);
@@ -80,7 +81,10 @@ export default function ExamRoom() {
 
         if (examData) {
           const duration = examData.duration_minutes || examData.duration;
-          if (duration) setTimeLeft(duration * 60);
+          if (duration) {
+            setTimeLeft(duration * 60);
+            setOriginalDurationSec(duration * 60);
+          }
           // Simpan konfigurasi penilaian ke state
           setExamConfig({
             correct_point: examData.correct_point ?? 4,
@@ -155,6 +159,62 @@ export default function ExamRoom() {
     const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     return () => clearInterval(timer);
   }, [loading, timeLeft, isBlocked]);
+
+  // 📡 REALTIME SYNC: Durasi, penilaian, dan status aktif dari admin
+  useEffect(() => {
+    if (!examId || examId === 'undefined') return;
+
+    const examChannel = supabase
+      .channel(`cbt_exams_realtime_${examId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'cbt_exams',
+          filter: `id=eq.${examId}`
+        },
+        (payload: any) => {
+          const updated = payload.new;
+          if (!updated) return;
+
+          // 🕐 REALTIME TIMER ADJUSTMENT
+          if (updated.duration_minutes !== undefined) {
+            const newTotalSec = updated.duration_minutes * 60;
+            setTimeLeft(prev => {
+              // Calculate delta: how much time was added/removed
+              const delta = newTotalSec - originalDurationSec;
+              const adjusted = Math.max(0, prev + delta);
+              console.log(`[CBT REALTIME] Durasi diubah admin: ${originalDurationSec/60}m → ${updated.duration_minutes}m | Delta: ${delta}s | TimeLeft: ${prev}s → ${adjusted}s`);
+              return adjusted;
+            });
+            setOriginalDurationSec(newTotalSec);
+          }
+
+          // 🔧 REALTIME SCORING CONFIG SYNC
+          if (updated.correct_point !== undefined || updated.penalty_point !== undefined || updated.empty_point !== undefined || updated.scoring_system) {
+            setExamConfig(prev => ({
+              correct_point: updated.correct_point ?? prev.correct_point,
+              penalty_point: updated.penalty_point ?? prev.penalty_point,
+              empty_point: updated.empty_point ?? prev.empty_point,
+              scoring_system: updated.scoring_system || prev.scoring_system,
+            }));
+            console.log(`[CBT REALTIME] Konfigurasi penilaian diperbarui admin.`);
+          }
+
+          // 🔒 REALTIME SESSION DEACTIVATION
+          if (updated.is_active === false && !isFinished) {
+            console.log(`[CBT REALTIME] Sesi dinonaktifkan oleh admin!`);
+            setIsBlocked(true);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(examChannel);
+    };
+  }, [examId, originalDurationSec, isFinished]);
 
   // 📡 REALTIME SUBSCRIPTION FOR FORCE SUBMIT
   useEffect(() => {

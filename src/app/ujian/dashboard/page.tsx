@@ -156,6 +156,37 @@ export default function StudentDashboard() {
       setLoading(false);
     };
     fetchAll();
+
+    // 📡 REALTIME: Durasi & Status ujian dari admin
+    if (parsedUser.active_exam_id) {
+      const examChannel = supabase
+        .channel(`dashboard_exam_sync_${parsedUser.active_exam_id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'cbt_exams',
+            filter: `id=eq.${parsedUser.active_exam_id}`
+          },
+          (payload: any) => {
+            const updated = payload.new;
+            if (!updated) return;
+            setExamDetail((prev: any) => ({ ...prev, ...updated }));
+
+            // Jika sesi dinonaktifkan admin saat peserta sedang di dashboard
+            if (updated.is_active === false) {
+              localStorage.removeItem('ncc_user');
+              router.push('/ujian/login');
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(examChannel);
+      };
+    }
   }, [router]);
 
   // ── PDF: gunakan window.print() + CSS @media print ───────────────────────────
