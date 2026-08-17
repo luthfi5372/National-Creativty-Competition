@@ -224,11 +224,22 @@ export async function loginLocalUser(formData: FormData): Promise<AuthResult> {
 
     // Resolusi Username ke Email
     if (!loginInput.includes('@')) {
-      // 1. Coba cari di profiles
-      const { data: profile } = await supabase.from('profiles').select('id').eq('username', loginInput).single();
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!serviceRoleKey) {
+        return { success: false, error: "Konfigurasi server tidak valid (Service Role Key hilang)." };
+      }
+      
+      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const serviceClient = createSupabaseClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+      });
+
+      // 1. Coba cari di profiles (Bypass RLS)
+      const { data: profile } = await serviceClient.from('profiles').select('id').eq('username', loginInput).single();
       if (profile) {
-        // 2. Coba cari email di competition_entries menggunakan user_id dari profiles
-        const { data: entry } = await supabase.from('competition_entries').select('email').eq('user_id', profile.id).single();
+        // 2. Coba cari email di competition_entries menggunakan user_id dari profiles (Bypass RLS)
+        const { data: entry } = await serviceClient.from('competition_entries').select('email').eq('user_id', profile.id).single();
         if (entry && entry.email) {
           email = entry.email.toLowerCase();
           console.log(`[Auth] Resolved username '${loginInput}' to email '${email}' via user_id`);
