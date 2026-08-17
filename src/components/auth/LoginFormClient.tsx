@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShineBorder } from "@/components/ui/ShineBorder";
 import { loginLocalUser } from "@/app/actions/auth";
-import { Mail, Lock, Eye, EyeOff, Loader2, Trophy, ArrowRight, CheckCircle2, Mic, Microscope, BookOpen, Sparkles, AlertCircle } from "lucide-react";
+import { User, Lock, Eye, EyeOff, Loader2, Trophy, ArrowRight, CheckCircle2, Mic, Microscope, BookOpen, Sparkles, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useLiveStats, GlobalStats } from "@/hooks/useLiveStats";
 
@@ -231,9 +231,9 @@ export default function LoginFormClient({ initialStats }: LoginFormClientProps) 
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="w-20 h-20 bg-white/10 border border-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center mb-8 shadow-2xl"
+            className="w-20 h-20 bg-indigo-600 border border-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center mb-8 shadow-2xl"
           >
-            <Trophy size={38} className="text-yellow-300 drop-shadow-lg" />
+            <span className="font-bold text-4xl text-white">N</span>
           </motion.div>
 
           <motion.h1
@@ -314,7 +314,7 @@ export default function LoginFormClient({ initialStats }: LoginFormClientProps) 
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8">
             <div className="w-11 h-11 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
-              <Trophy size={20} className="text-yellow-300" />
+              <span className="font-bold text-xl text-white">N</span>
             </div>
             <div>
               <div className="font-bold text-slate-900 text-sm">NCC 13th</div>
@@ -376,18 +376,18 @@ export default function LoginFormClient({ initialStats }: LoginFormClientProps) 
                       )}
                     </AnimatePresence>
 
-                    {/* Email */}
+                    {/* Email / Username */}
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Email / Username</label>
                       <div className="relative">
-                        <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                         <input
-                          type="email"
+                          type="text"
                           required
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className="block w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 focus:bg-white transition-all text-sm"
-                          placeholder="nama@email.com"
+                          placeholder="nama@email.com atau username"
                         />
                       </div>
                     </div>

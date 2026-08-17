@@ -139,20 +139,20 @@ export async function syncEntryOnDaftar(email: string, userId: string, password:
 
 /** Login user menggunakan Supabase Auth */
 export async function loginLocalUser(formData: FormData): Promise<AuthResult> {
-  const email = formData.get("email")?.toString().trim().toLowerCase();
+  const loginInput = formData.get("email")?.toString().trim().toLowerCase();
   const password = formData.get("password")?.toString();
 
-  if (!email || !password) {
-    return { success: false, error: "Email dan kata sandi wajib diisi." };
+  if (!loginInput || !password) {
+    return { success: false, error: "Email/Username dan kata sandi wajib diisi." };
   }
 
   // 🔥 TAKTIK 3: HARDCODE BYPASS KHUSUS ADMIN (STEALTH MODE)
   const adminEmails = ["admin@ncc.id", "admin1@ncc.id", "halo.ncc@gmail.com"];
   const isAdminBypass = 
-    (email === 'admin1@ncc.id' && password === '123456') ||
-    (email === 'admin' && password === 'admin123') ||
-    (email === 'admin@ncc.id' && password === 'admin123') ||
-    (email === 'halo.ncc@gmail.com' && password === 'ncc2026');
+    (loginInput === 'admin1@ncc.id' && password === '123456') ||
+    (loginInput === 'admin' && password === 'admin123') ||
+    (loginInput === 'admin@ncc.id' && password === 'admin123') ||
+    (loginInput === 'halo.ncc@gmail.com' && password === 'ncc2026');
 
   if (isAdminBypass) {
     const cookieStore = await cookies();
@@ -163,7 +163,7 @@ export async function loginLocalUser(formData: FormData): Promise<AuthResult> {
     // This allows the admin client to bypass the Row Level Security (RLS) policies and see the participant list.
     try {
       const supabase = await createClient();
-      const authEmail = email === "admin" ? "admin@ncc.id" : email;
+      const authEmail = loginInput === "admin" ? "admin@ncc.id" : loginInput;
       const authPassword = password;
 
       console.log(`[Admin Bridge] Attempting to sign in admin to Supabase Auth: ${authEmail}...`);
@@ -220,7 +220,27 @@ export async function loginLocalUser(formData: FormData): Promise<AuthResult> {
 
   try {
     const supabase = await createClient();
-    
+    let email = loginInput;
+
+    // Resolusi Username ke Email
+    if (!loginInput.includes('@')) {
+      // 1. Coba cari di profiles
+      const { data: profile } = await supabase.from('profiles').select('id').eq('username', loginInput).single();
+      if (profile) {
+        // 2. Coba cari email di competition_entries menggunakan user_id dari profiles
+        const { data: entry } = await supabase.from('competition_entries').select('email').eq('user_id', profile.id).single();
+        if (entry && entry.email) {
+          email = entry.email.toLowerCase();
+          console.log(`[Auth] Resolved username '${loginInput}' to email '${email}' via user_id`);
+        } else {
+          // Fallback: cari di notes (barangkali disimpan di sana), atau kembalikan error
+          return { success: false, error: "Username ditemukan tetapi email tidak terhubung. Gunakan email untuk login." };
+        }
+      } else {
+        return { success: false, error: "Username tidak ditemukan." };
+      }
+    }
+
     let signInResult = null;
     try {
       signInResult = await supabase.auth.signInWithPassword({
