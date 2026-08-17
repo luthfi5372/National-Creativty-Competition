@@ -97,9 +97,9 @@ export default function IntegratedLLMSDashboard() {
       is_active: editingSession.is_active,
       shuffle_questions: editingSession.shuffle_questions ?? true,
       scoring_system: editingSession.scoring_system || 'Custom',
-      correct_point: parseInt(editingSession.correct_point) ?? 0,
-      penalty_point: parseInt(editingSession.penalty_point) ?? 0,
-      empty_point: parseFloat(editingSession.empty_point) ?? 0,
+      correct_point: Number(editingSession.correct_point) || 0,
+      penalty_point: Number(editingSession.penalty_point) || 0,
+      empty_point: Number(editingSession.empty_point) || 0,
       description: editingSession.description || '',
     }).eq('id', editingSession.id);
     if (!error) {

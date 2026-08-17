@@ -147,7 +147,7 @@ export default function StudentDashboard() {
           await supabase.from('cbt_attempts').insert({
             user_id: userId, exam_id: parsedUser.active_exam_id,
             violations_count: 0, score: 0, status_passing: 'PENDING',
-            updated_at: new Date().toISOString()
+            started_at: new Date().toISOString(), updated_at: new Date().toISOString()
           });
           setIsDone(false); setStatusPassing('PENDING');
           localStorage.removeItem(`cbt_submitted_${parsedUser.active_exam_id}`);

@@ -131,6 +131,18 @@ export default function ExamRoom() {
             return; // Hentikan inisialisasi agar UI tetap loading / redirect instan
           }
 
+          // ⏱️ RESUME TIMER: Hitung waktu yang sudah berlalu saat refresh/reconnect
+          if (existingUser.started_at || existingUser.created_at) {
+            const startedAt = new Date(existingUser.started_at || existingUser.created_at).getTime();
+            const now = Date.now();
+            const elapsedSec = Math.floor((now - startedAt) / 1000);
+            const totalDurationSec = (examData?.duration_minutes || examData?.duration || 90) * 60;
+            const remaining = Math.max(0, totalDurationSec - elapsedSec);
+            setTimeLeft(remaining);
+            setOriginalDurationSec(totalDurationSec);
+            console.log(`[CBT RESUME] Elapsed: ${Math.floor(elapsedSec/60)}m ${elapsedSec%60}s | Remaining: ${Math.floor(remaining/60)}m ${remaining%60}s`);
+          }
+
           // Restorasi jawaban tersimpan jika terputus/refresh halaman
           if (existingUser.answers) {
             setAnswers(existingUser.answers);
@@ -141,7 +153,7 @@ export default function ExamRoom() {
           await supabase.from('cbt_attempts').update({ updated_at: new Date().toISOString() }).eq('user_id', userId).eq('exam_id', examId);
         } else {
           await supabase.from('cbt_attempts').insert({ 
-            user_id: userId, exam_id: examId, violations_count: 0, updated_at: new Date().toISOString() 
+            user_id: userId, exam_id: examId, violations_count: 0, started_at: new Date().toISOString(), updated_at: new Date().toISOString() 
           });
         }
 
@@ -337,7 +349,7 @@ export default function ExamRoom() {
       // 1. Hitung Skor berdasarkan konfigurasi admin (correct_point / penalty_point / empty_point)
       let finalScore = 0;
       if (questions.length > 0) {
-        const { correct_point, penalty_point, empty_point } = examConfig;
+        const { correct_point, penalty_point, empty_point, scoring_system } = examConfig;
         questions.forEach(q => {
           const userAnswer = answers[q.id] || '';
           const qType = q.options?.type || 'pg';
@@ -349,7 +361,12 @@ export default function ExamRoom() {
               const correctAnswers = String(q.correct_answer || '').toUpperCase().split('|').map(x => x.trim());
               const studentAns = String(userAnswer).trim().toUpperCase();
               if (correctAnswers.includes(studentAns)) {
-                finalScore += Number(q.options?.points?.correct ?? 4);
+                // Custom mode: use per-question points; Fixed/Penalty: use exam-level correct_point
+                if (scoring_system === 'Custom' && q.options?.points?.correct !== undefined) {
+                  finalScore += Number(q.options.points.correct);
+                } else {
+                  finalScore += correct_point;
+                }
               } else {
                 finalScore += penalty_point <= 0 ? penalty_point : -penalty_point;
               }
@@ -359,8 +376,8 @@ export default function ExamRoom() {
             const score = Number(grades[q.id] || 0);
             finalScore += score;
           } else {
-            // Cek jika ada custom option points di q.options.points
-            if (q.options && typeof q.options === 'object' && q.options.points) {
+            // PG: Custom mode with per-option points
+            if (scoring_system === 'Custom' && q.options && typeof q.options === 'object' && q.options.points) {
               if (!userAnswer) {
                 finalScore += empty_point;
               } else {
@@ -373,7 +390,7 @@ export default function ExamRoom() {
                 });
               }
             } else {
-              // Penilaian standar
+              // Fixed / Penalty: standard scoring
               const correct = String(q.correct_answer || '').trim().toUpperCase();
               const user    = String(userAnswer).trim().toUpperCase();
 
