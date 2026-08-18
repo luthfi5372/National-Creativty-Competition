@@ -14,7 +14,7 @@ import {
   ShieldCheck, AlertTriangle, FileDown, ChevronRight,
   Loader2, X, Save, Pencil, ToggleLeft, ToggleRight, Trash2,
   Zap, Activity, Radio, Lock, MoreHorizontal, MessageSquare, Info, Check, FolderOpen,
-  Shuffle, ListOrdered, Target, Sliders, Award, HelpCircle
+  Shuffle, ListOrdered, Target, Sliders, Award, HelpCircle, Pause, RefreshCw
 } from "lucide-react";
 
 export default function IntegratedLLMSDashboard() {
@@ -56,6 +56,19 @@ export default function IntegratedLLMSDashboard() {
   const [entryCount, setEntryCount] = useState<number | null>(null);
   const [showShufflePopup, setShowShufflePopup] = useState(false);
 
+  // ⚙️ Global Token Settings State
+  const [globalTokenConfig, setGlobalTokenConfig] = useState<{
+    tokenEnabled: boolean;
+    tokenIntervalMinutes: number;
+    isTokenPaused: boolean;
+    pausedAt?: number | null;
+  }>({
+    tokenEnabled: true,
+    tokenIntervalMinutes: 10,
+    isTokenPaused: false,
+    pausedAt: null
+  });
+
   // Auto-dismiss shuffle popup — single setTimeout, zero interval re-renders
   useEffect(() => {
     if (!showShufflePopup) return;
@@ -71,6 +84,62 @@ export default function IntegratedLLMSDashboard() {
       if (count !== null) setEntryCount(count);
     };
     fetchEntryCount();
+
+    // Fetch token settings
+    const fetchTokenConfig = async () => {
+      try {
+        const { data } = await supabase
+          .from('announcements')
+          .select('*')
+          .eq('title', 'SYS_TOKEN_SETTINGS')
+          .maybeSingle();
+
+        if (data && data.content) {
+          try {
+            const parsed = JSON.parse(data.content);
+            setGlobalTokenConfig({
+              tokenEnabled: parsed.tokenEnabled ?? true,
+              tokenIntervalMinutes: Number(parsed.tokenIntervalMinutes) || 10,
+              isTokenPaused: Boolean(parsed.isTokenPaused),
+              pausedAt: parsed.pausedAt || null
+            });
+          } catch (e) {}
+        }
+      } catch (err) {
+        console.error("Gagal memuat token settings:", err);
+      }
+    };
+    fetchTokenConfig();
+
+    const tokenChannel = supabase
+      .channel('public:sys_token_settings_hq')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'announcements',
+          filter: 'title=eq.SYS_TOKEN_SETTINGS'
+        },
+        (payload: any) => {
+          if (payload.new && payload.new.content) {
+            try {
+              const parsed = JSON.parse(payload.new.content);
+              setGlobalTokenConfig({
+                tokenEnabled: parsed.tokenEnabled ?? true,
+                tokenIntervalMinutes: Number(parsed.tokenIntervalMinutes) || 10,
+                isTokenPaused: Boolean(parsed.isTokenPaused),
+                pausedAt: parsed.pausedAt || null
+              });
+            } catch (e) {}
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(tokenChannel);
+    };
   }, []);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -362,7 +431,11 @@ export default function IntegratedLLMSDashboard() {
 
   const renderSessionCard = (session: any) => {
     const isActive = session.is_active;
-    const sessionToken = (session.token && session.token.trim() !== '') ? session.token.trim().toUpperCase() : getLiveToken(session.id);
+    const sessionToken = !globalTokenConfig.tokenEnabled
+      ? "BEBAS TOKEN"
+      : (session.token && session.token.trim() !== '') 
+        ? session.token.trim().toUpperCase() 
+        : getLiveToken(session.id, globalTokenConfig);
 
     // Scoring system badge content
     const scoringLabel = `DURASI: ${session.duration_minutes || 90} MENIT`;
@@ -910,7 +983,11 @@ export default function IntegratedLLMSDashboard() {
                 )}
               </div>
 
-              <TokenRotationWidget />
+              <TokenRotationWidget 
+                config={globalTokenConfig}
+                onConfigChange={setGlobalTokenConfig}
+                showToast={showToast}
+              />
             </div>
           </div>
         </div>
@@ -1636,12 +1713,25 @@ export default function IntegratedLLMSDashboard() {
 
 // ─── ⚡ PURE UTILITY FUNCTIONS (COMPILATION & MEMORY OPTIMIZATION) ───
 
-const getLiveToken = (sessionId: string) => {
+const getLiveToken = (
+  sessionId: string,
+  tokenConfig?: {
+    tokenEnabled: boolean;
+    tokenIntervalMinutes: number;
+    isTokenPaused: boolean;
+    pausedAt?: number | null;
+  }
+) => {
   if (!sessionId) return "------";
+  if (tokenConfig && !tokenConfig.tokenEnabled) return "NO TOKEN";
+
   const charPool = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const now = Math.floor(Date.now() / 1000);
-  const interval10Min = 600; 
-  const currentInterval = Math.floor(now / interval10Min);
+  const intervalSec = ((tokenConfig?.tokenIntervalMinutes || 10) * 60);
+  const now = tokenConfig?.isTokenPaused && tokenConfig?.pausedAt
+    ? tokenConfig.pausedAt
+    : Math.floor(Date.now() / 1000);
+
+  const currentInterval = Math.floor(now / intervalSec);
   
   let token = "";
   let idSum = 5381;
@@ -1656,40 +1746,240 @@ const getLiveToken = (sessionId: string) => {
   return token;
 };
 
-// ─── ⚡ SELF-CONTAINED MINI WIDGET (ELIMINATES FULL-DASHBOARD RE-RENDERS) ───
+// ─── ⚡ INTERACTIVE ADVANCED TOKEN MANAGEMENT WIDGET ───
 
-function TokenRotationWidget() {
+function TokenRotationWidget({
+  config,
+  onConfigChange,
+  showToast
+}: {
+  config: {
+    tokenEnabled: boolean;
+    tokenIntervalMinutes: number;
+    isTokenPaused: boolean;
+    pausedAt?: number | null;
+  };
+  onConfigChange: (newConfig: any) => void;
+  showToast: (msg: string, type?: 'success' | 'error') => void;
+}) {
   const [countdown, setCountdown] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [customMinutes, setCustomMinutes] = useState(config.tokenIntervalMinutes || 10);
 
   useEffect(() => {
+    setCustomMinutes(config.tokenIntervalMinutes || 10);
+  }, [config.tokenIntervalMinutes]);
+
+  useEffect(() => {
+    if (!config.tokenEnabled || config.isTokenPaused) {
+      setCountdown(0);
+      return;
+    }
+
+    const intervalSec = (config.tokenIntervalMinutes || 10) * 60;
     const updateTimer = () => {
       const now = Math.floor(Date.now() / 1000);
-      const interval10Min = 600; 
-      const secondsLeft = interval10Min - (now % interval10Min);
+      const secondsLeft = intervalSec - (now % intervalSec);
       setCountdown(secondsLeft);
     };
+
     updateTimer(); 
     const timer = setInterval(updateTimer, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [config.tokenEnabled, config.tokenIntervalMinutes, config.isTokenPaused]);
+
+  const handleToggleToken = async () => {
+    const newEnabled = !config.tokenEnabled;
+    const updated = { ...config, tokenEnabled: newEnabled };
+    onConfigChange(updated);
+    setIsSaving(true);
+    try {
+      const { saveTokenSettings } = await import("@/app/actions/auth");
+      const res = await saveTokenSettings(updated);
+      if (res.success) {
+        showToast(`Fitur token berhasil ${newEnabled ? 'diaktifkan' : 'dinonaktifkan (bebas token)'}!`, 'success');
+      } else {
+        showToast('Gagal menyimpan pengaturan token.', 'error');
+      }
+    } catch (e: any) {
+      showToast('Error: ' + e.message, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleTogglePause = async () => {
+    const newPaused = !config.isTokenPaused;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const updated = {
+      ...config,
+      isTokenPaused: newPaused,
+      pausedAt: newPaused ? nowSec : null
+    };
+    onConfigChange(updated);
+    setIsSaving(true);
+    try {
+      const { saveTokenSettings } = await import("@/app/actions/auth");
+      const res = await saveTokenSettings(updated);
+      if (res.success) {
+        showToast(newPaused ? '⏸️ Rotasi token berhasil dijeda!' : '▶️ Rotasi token kembali berjalan!', 'success');
+      } else {
+        showToast('Gagal mengubah status rotasi token.', 'error');
+      }
+    } catch (e: any) {
+      showToast('Error: ' + e.message, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveMinutes = async () => {
+    const mins = Math.max(1, Math.min(1440, Number(customMinutes) || 10));
+    const updated = { ...config, tokenIntervalMinutes: mins };
+    onConfigChange(updated);
+    setIsSaving(true);
+    try {
+      const { saveTokenSettings } = await import("@/app/actions/auth");
+      const res = await saveTokenSettings(updated);
+      if (res.success) {
+        showToast(`Durasi rotasi token diset ke ${mins} menit!`, 'success');
+        setShowSettings(false);
+      } else {
+        showToast('Gagal menyimpan durasi token.', 'error');
+      }
+    } catch (e: any) {
+      showToast('Error: ' + e.message, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
-    <div className="bg-gradient-to-br from-indigo-500/5 via-violet-500/5 to-purple-500/5 border border-indigo-100 rounded-3xl p-5 shadow-lg shadow-indigo-100/5">
-      <div className="flex items-center gap-2 mb-3.5">
-        <div className="w-7 h-7 bg-indigo-500/10 border border-indigo-200/50 rounded-xl flex items-center justify-center shadow-sm">
-          <Lock className="w-4 h-4 text-indigo-600" />
+    <div className="bg-gradient-to-br from-indigo-500/5 via-violet-500/5 to-purple-500/5 border border-indigo-100 rounded-3xl p-5 shadow-lg shadow-indigo-100/5 space-y-4">
+      {/* Header Widget */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 bg-indigo-500/10 border border-indigo-200/50 rounded-xl flex items-center justify-center shadow-sm">
+            <Lock className="w-4 h-4 text-indigo-600" />
+          </div>
+          <div>
+            <h3 className="text-xs font-black text-indigo-900 uppercase tracking-widest leading-none">Info & Aturan Token</h3>
+            <p className="text-[9px] text-indigo-400 font-bold mt-0.5">Kontrol Keamanan Ujian Live</p>
+          </div>
         </div>
-        <h3 className="text-xs font-black text-indigo-900 uppercase tracking-widest">Info Token</h3>
+
+        {/* Master Toggle Token */}
+        <button
+          onClick={handleToggleToken}
+          disabled={isSaving}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-sm border ${
+            config.tokenEnabled
+              ? 'bg-emerald-500 text-white border-emerald-400 hover:bg-emerald-600'
+              : 'bg-slate-200 text-slate-600 border-slate-300 hover:bg-slate-300'
+          }`}
+          title={config.tokenEnabled ? "Klik untuk mematikan wajib token" : "Klik untuk menyalakan wajib token"}
+        >
+          {config.tokenEnabled ? (
+            <><ToggleRight className="w-4 h-4 animate-pulse" /> Wajib Token (ON)</>
+          ) : (
+            <><ToggleLeft className="w-4 h-4" /> Bebas Token (OFF)</>
+          )}
+        </button>
       </div>
+
+      {/* Description */}
       <p className="text-[11px] text-indigo-950/80 leading-relaxed font-medium">
-        Token sesi diatur kustom oleh admin atau berotasi otomatis setiap <span className="font-extrabold text-indigo-600 bg-indigo-100/50 px-1.5 py-0.5 rounded border border-indigo-200/30">10 menit</span>. Bagikan token aktif ke peserta sebelum ujian dimulai.
+        {config.tokenEnabled ? (
+          <>
+            Token aktif di login ujian. Berotasi otomatis tiap{' '}
+            <span className="font-extrabold text-indigo-600 bg-indigo-100/50 px-1.5 py-0.5 rounded border border-indigo-200/30">
+              {config.tokenIntervalMinutes || 10} menit
+            </span>
+            {config.isTokenPaused && (
+              <span className="ml-1 text-amber-600 font-black bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                (Sedang Dijeda)
+              </span>
+            )}.
+          </>
+        ) : (
+          <>
+            🚫 <span className="font-black text-rose-600">Fitur Token Dimatikan:</span> Peserta dapat masuk dan login langsung hanya dengan ID Tiket tanpa perlu memasukkan token apapun.
+          </>
+        )}
       </p>
-      <div className="mt-4 flex items-center gap-2.5 p-3 bg-white/80 backdrop-blur-md border border-indigo-100/80 rounded-2xl shadow-sm">
-        <Clock className="w-4 h-4 text-indigo-500 animate-spin" style={{ animationDuration: '6s' }} />
-        <span className="text-xs font-mono text-indigo-900 font-extrabold tracking-wide">
-          Rotasi dinamis dalam: <span className="text-indigo-600 font-black">{Math.floor(countdown/60)}:{(countdown%60).toString().padStart(2,'0')}</span>
-        </span>
-      </div>
+
+      {/* Countdown & Live Controls Bar */}
+      {config.tokenEnabled && (
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between p-3 bg-white/90 backdrop-blur-md border border-indigo-100/80 rounded-2xl shadow-sm">
+            <div className="flex items-center gap-2">
+              <Clock className={`w-4 h-4 ${config.isTokenPaused ? 'text-amber-500' : 'text-indigo-500 animate-spin'}`} style={{ animationDuration: '6s' }} />
+              <span className="text-xs font-mono text-indigo-900 font-extrabold tracking-wide">
+                {config.isTokenPaused ? (
+                  <span className="text-amber-600 font-black">ROTASI TERJEDA</span>
+                ) : (
+                  <>Rotasi dalam: <span className="text-indigo-600 font-black">{Math.floor(countdown/60)}:{(countdown%60).toString().padStart(2,'0')}</span></>
+                )}
+              </span>
+            </div>
+
+            {/* Quick Actions: Pause & Setting */}
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleTogglePause}
+                disabled={isSaving}
+                className={`p-1.5 rounded-lg border text-[10px] font-bold transition-all flex items-center gap-1 ${
+                  config.isTokenPaused
+                    ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                    : 'bg-indigo-50 border-indigo-100 text-indigo-700 hover:bg-indigo-100'
+                }`}
+                title={config.isTokenPaused ? "Lanjutkan Rotasi" : "Jeda Rotasi Token"}
+              >
+                {config.isTokenPaused ? <Play className="w-3.5 h-3.5 fill-amber-700" /> : <Pause className="w-3.5 h-3.5 fill-indigo-700" />}
+                <span className="text-[9px] uppercase font-black">{config.isTokenPaused ? "Resume" : "Pause"}</span>
+              </button>
+
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                title="Ubah Durasi Rotasi"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Settings Drawer */}
+          {showSettings && (
+            <div className="p-3.5 bg-indigo-50/60 border border-indigo-100 rounded-2xl space-y-2.5 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between">
+                <label className="text-[9px] font-black uppercase tracking-wider text-indigo-900">
+                  Atur Durasi Rotasi Otomatis (Menit)
+                </label>
+                <span className="text-[8px] font-bold text-indigo-400">1 - 1440 mnt</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={1440}
+                  value={customMinutes}
+                  onChange={(e) => setCustomMinutes(parseInt(e.target.value) || 1)}
+                  className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+                <button
+                  onClick={handleSaveMinutes}
+                  disabled={isSaving}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 shadow-sm active:scale-95 disabled:opacity-50"
+                >
+                  {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Simpan"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

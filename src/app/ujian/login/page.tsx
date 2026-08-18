@@ -23,6 +23,81 @@ export default function ParticipantLogin() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<{ title: string; desc: string } | null>(null);
 
+  // ⚙️ Token Settings State
+  const [tokenSettings, setTokenSettings] = useState<{
+    tokenEnabled: boolean;
+    tokenIntervalMinutes: number;
+    isTokenPaused: boolean;
+    pausedAt?: number | null;
+  }>({
+    tokenEnabled: true,
+    tokenIntervalMinutes: 10,
+    isTokenPaused: false,
+    pausedAt: null
+  });
+  const [settingsLoading, setSettingsLoading] = useState(true);
+
+  // Load token settings & listen for realtime updates
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const { data: portalData } = await supabase
+          .from('announcements')
+          .select('*')
+          .eq('title', 'SYS_TOKEN_SETTINGS')
+          .maybeSingle();
+
+        if (portalData && portalData.content) {
+          try {
+            const parsed = JSON.parse(portalData.content);
+            setTokenSettings({
+              tokenEnabled: parsed.tokenEnabled ?? true,
+              tokenIntervalMinutes: Number(parsed.tokenIntervalMinutes) || 10,
+              isTokenPaused: Boolean(parsed.isTokenPaused),
+              pausedAt: parsed.pausedAt || null
+            });
+          } catch (e) {}
+        }
+      } catch (err) {
+        console.error("Gagal memuat token settings:", err);
+      } finally {
+        setSettingsLoading(false);
+      }
+    };
+
+    loadSettings();
+
+    const channel = supabase
+      .channel('public:sys_token_settings_login')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'announcements',
+          filter: 'title=eq.SYS_TOKEN_SETTINGS'
+        },
+        (payload: any) => {
+          if (payload.new && payload.new.content) {
+            try {
+              const parsed = JSON.parse(payload.new.content);
+              setTokenSettings({
+                tokenEnabled: parsed.tokenEnabled ?? true,
+                tokenIntervalMinutes: Number(parsed.tokenIntervalMinutes) || 10,
+                isTokenPaused: Boolean(parsed.isTokenPaused),
+                pausedAt: parsed.pausedAt || null
+              });
+            } catch (e) {}
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   // Normalisasi input: hilangkan prefix "NCC-" jika ada, ambil kode alfanumeriknya
   const parseTicketNumber = (raw: string): string => {
     return raw.trim().toUpperCase().replace(/^NCC[-\s]*/i, '').trim();
@@ -150,59 +225,78 @@ export default function ParticipantLogin() {
         setLoading(false); return;
       }
 
-      // ─── LANGKAH 6: Validasi Token (Custom Token & Rolling Token 10 Menit) ────────
-      const now = Math.floor(Date.now() / 1000);
-      const interval10Min = 600;
-      const currentInterval = Math.floor(now / interval10Min);
-      const charPool = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
       let matchedExam = null;
-      const userToken = tokenInput.toUpperCase().trim();
 
-      // Toleransi perbedaan waktu (clock drift) ±10 menit dengan mengecek 3 interval: sekarang, sebelumnya, dan berikutnya
-      const targetIntervals = [currentInterval, currentInterval - 1, currentInterval + 1];
+      // ─── LANGKAH 6: Validasi Token (Jika Token Diaktifkan) ────────
+      if (!tokenSettings.tokenEnabled) {
+        // 🔥 JIKA FITUR TOKEN DINONAKTIFKAN: Langsung sambungkan ke sesi aktif pertama
+        matchedExam = exams[0];
+      } else {
+        // 🔥 JIKA FITUR TOKEN DIAKTIFKAN: Validasi token kustom atau token dinamis
+        const intervalSec = (tokenSettings.tokenIntervalMinutes || 10) * 60;
+        const nowSec = tokenSettings.isTokenPaused && tokenSettings.pausedAt 
+          ? tokenSettings.pausedAt 
+          : Math.floor(Date.now() / 1000);
 
-      for (const exam of exams) {
-        let isMatched = false;
+        const currentInterval = Math.floor(nowSec / intervalSec);
+        const charPool = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        const userToken = tokenInput.toUpperCase().trim();
 
-        // 1. Cek Custom Token Tetap (Jika diset oleh admin di DB)
-        if (exam.token && exam.token.trim().toUpperCase() === userToken) {
-          isMatched = true;
+        if (!userToken) {
+          setErrorMsg({
+            title: 'Token Wajib Diisi',
+            desc: 'Sesi ujian ini memerlukan Token Akses. Silakan masukkan token dari pengawas.'
+          });
+          setLoading(false); return;
         }
 
-        // 2. Cek Dynamic Rolling Token (Default TOTP 10-menit)
-        if (!isMatched) {
-          for (const interval of targetIntervals) {
-            let expectedToken = "";
-            let idSum = 5381;
-            for (let i = 0; i < exam.id.length; i++) {
-              idSum = ((idSum * 33) ^ exam.id.charCodeAt(i)) >>> 0;
-            }
-            let seed = (idSum + interval) % 10000;
-            for (let i = 0; i < 6; i++) {
-              seed = (seed * 9301 + 49297) % 233280;
-              expectedToken += charPool[Math.floor((seed / 233280) * charPool.length)];
-            }
+        // Toleransi drift hanya bila tidak di-pause
+        const targetIntervals = tokenSettings.isTokenPaused
+          ? [currentInterval]
+          : [currentInterval, currentInterval - 1, currentInterval + 1];
 
-            if (userToken === expectedToken) {
-              isMatched = true;
-              break;
+        for (const exam of exams) {
+          let isMatched = false;
+
+          // 1. Cek Custom Token Tetap
+          if (exam.token && exam.token.trim().toUpperCase() === userToken) {
+            isMatched = true;
+          }
+
+          // 2. Cek Dynamic Rolling Token
+          if (!isMatched) {
+            for (const interval of targetIntervals) {
+              let expectedToken = "";
+              let idSum = 5381;
+              for (let i = 0; i < exam.id.length; i++) {
+                idSum = ((idSum * 33) ^ exam.id.charCodeAt(i)) >>> 0;
+              }
+              let seed = (idSum + interval) % 10000;
+              for (let i = 0; i < 6; i++) {
+                seed = (seed * 9301 + 49297) % 233280;
+                expectedToken += charPool[Math.floor((seed / 233280) * charPool.length)];
+              }
+
+              if (userToken === expectedToken) {
+                isMatched = true;
+                break;
+              }
             }
+          }
+
+          if (isMatched) {
+            matchedExam = exam;
+            break;
           }
         }
 
-        if (isMatched) {
-          matchedExam = exam;
-          break;
+        if (!matchedExam) {
+          setErrorMsg({
+            title: 'Token Ujian Tidak Valid',
+            desc: 'Token salah atau sudah kedaluwarsa. Lihat token terbaru di layar pengawas.'
+          });
+          setLoading(false); return;
         }
-      }
-
-      if (!matchedExam) {
-        setErrorMsg({
-          title: 'Token Ujian Tidak Valid',
-          desc: 'Token salah atau sudah kedaluwarsa. Lihat token terbaru di layar pengawas.'
-        });
-        setLoading(false); return;
       }
 
       // Determine the correct ticket code to store (prefer custom ticket id if available)
@@ -308,29 +402,35 @@ export default function ParticipantLogin() {
             </p>
           </div>
 
-          {/* ── FIELD 2: TOKEN UJIAN LIVE ── */}
-          <div>
-            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2 ml-2 flex items-center justify-between">
-              <span>Token Ujian (Live)</span>
-              <span className="text-[8px] bg-indigo-50 text-indigo-500 px-2 py-0.5 rounded-full">Berubah tiap 10 mnt</span>
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                <Key className="h-5 w-5 text-[#5145cd]" />
+          {/* ── FIELD 2: TOKEN UJIAN LIVE (HANYA DITAMPILKAN JIKA TOKEN DIAKTIFKAN ADMIN) ── */}
+          {tokenSettings.tokenEnabled && (
+            <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2 ml-2 flex items-center justify-between">
+                <span>Token Ujian (Live)</span>
+                <span className="text-[8px] bg-indigo-50 text-indigo-500 px-2 py-0.5 rounded-full font-bold">
+                  {tokenSettings.isTokenPaused 
+                    ? '⏸️ Token Terjeda' 
+                    : `Berubah tiap ${tokenSettings.tokenIntervalMinutes || 10} mnt`}
+                </span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                  <Key className="h-5 w-5 text-[#5145cd]" />
+                </div>
+                <input
+                  id="token-input"
+                  type="text"
+                  required={tokenSettings.tokenEnabled}
+                  maxLength={6}
+                  value={tokenInput}
+                  onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
+                  placeholder="••••••"
+                  autoComplete="off"
+                  className="w-full pl-12 pr-5 py-4 bg-indigo-50/30 border border-indigo-100 rounded-[20px] text-lg tracking-[0.3em] font-black focus:bg-white focus:ring-2 focus:ring-[#5145cd]/20 focus:border-[#5145cd] transition-all outline-none text-[#5145cd] placeholder-indigo-200 uppercase"
+                />
               </div>
-              <input
-                id="token-input"
-                type="text"
-                required
-                maxLength={6}
-                value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
-                placeholder="••••••"
-                autoComplete="off"
-                className="w-full pl-12 pr-5 py-4 bg-indigo-50/30 border border-indigo-100 rounded-[20px] text-lg tracking-[0.3em] font-black focus:bg-white focus:ring-2 focus:ring-[#5145cd]/20 focus:border-[#5145cd] transition-all outline-none text-[#5145cd] placeholder-indigo-200"
-              />
             </div>
-          </div>
+          )}
 
           {/* ── TOMBOL MASUK ── */}
           <button

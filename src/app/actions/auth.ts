@@ -896,5 +896,104 @@ export async function getActiveExams() {
   }
 }
 
+/** Mengambil konfigurasi token CBT secara aman dari server (RLS bypass) */
+export async function getTokenSettings() {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { data, error } = await client
+      .from('announcements')
+      .select('*')
+      .eq('title', 'SYS_TOKEN_SETTINGS')
+      .maybeSingle();
+
+    if (data && data.content) {
+      try {
+        const parsed = JSON.parse(data.content);
+        return { data: parsed, error: null };
+      } catch (e) {
+        return { data: null, error: "Format settings tidak valid." };
+      }
+    }
+
+    return { 
+      data: {
+        tokenEnabled: true,
+        tokenIntervalMinutes: 10,
+        isTokenPaused: false,
+        pausedAt: null,
+        updatedAt: new Date().toISOString()
+      }, 
+      error: null 
+    };
+  } catch (err: any) {
+    console.error("[Server Action] Exception getTokenSettings:", err);
+    return { data: null, error: err.message || "Gagal mengambil token settings." };
+  }
+}
+
+/** Menyimpan konfigurasi token CBT secara aman ke server (RLS bypass) */
+export async function saveTokenSettings(settings: {
+  tokenEnabled: boolean;
+  tokenIntervalMinutes: number;
+  isTokenPaused: boolean;
+  pausedAt?: number | null;
+}) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const payload = {
+      title: 'SYS_TOKEN_SETTINGS',
+      message: 'SYS_TOKEN_SETTINGS',
+      content: JSON.stringify({
+        ...settings,
+        updatedAt: new Date().toISOString()
+      }),
+      type: 'system',
+      target_audience: 'all'
+    };
+
+    const { data: existing } = await client
+      .from('announcements')
+      .select('id')
+      .eq('title', 'SYS_TOKEN_SETTINGS')
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await client
+        .from('announcements')
+        .update({ content: payload.content, updated_at: new Date().toISOString() })
+        .eq('id', existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await client
+        .from('announcements')
+        .insert([payload]);
+      if (error) throw error;
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception saveTokenSettings:", err);
+    return { success: false, error: err.message || "Gagal menyimpan token settings." };
+  }
+}
+
 
 
