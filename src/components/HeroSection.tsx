@@ -155,6 +155,12 @@ export default function HeroSection() {
             <img 
               src="/mascots.svg" 
               alt="Nicci & Nicco Mascots" 
+              width="650"
+              height="434"
+              loading="eager"
+              // @ts-ignore
+              fetchPriority="high"
+              decoding="async"
               className="w-full h-full object-contain filter drop-shadow-[0_25px_50px_-12px_rgba(99,102,241,0.18)]" 
             />
           </motion.div>

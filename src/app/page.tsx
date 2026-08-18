@@ -55,35 +55,39 @@ export default function Home() {
             <HeroSection />
           </section>
 
-          <section className="min-h-screen w-full py-24 flex items-center justify-center">
+          <section className="min-h-screen w-full py-24 flex items-center justify-center content-auto">
             <FeatureGrid />
           </section>
 
-          <section className="min-h-screen w-full py-24 flex items-center justify-center">
+          <section className="min-h-screen w-full py-24 flex items-center justify-center content-auto">
             <GallerySection />
           </section>
 
-          <SponsorsSection />
+          <div className="content-auto">
+            <SponsorsSection />
+          </div>
 
-          <section id="kategori" className="min-h-screen w-full py-24 flex items-center justify-center">
+          <section id="kategori" className="min-h-screen w-full py-24 flex items-center justify-center content-auto">
             <CategoryCards />
           </section>
 
-          <section className="min-h-screen w-full py-24 flex items-center justify-center">
+          <section className="min-h-screen w-full py-24 flex items-center justify-center content-auto">
             <PricingSection />
           </section>
 
-          <section className="min-h-screen w-full py-24 flex items-center justify-center">
+          <section className="min-h-screen w-full py-24 flex items-center justify-center content-auto">
             <IndonesiaMap />
           </section>
 
-          <TimelineSection />
+          <div className="content-auto">
+            <TimelineSection />
+          </div>
 
-          <section id="faq" className="min-h-screen w-full py-24 flex items-center justify-center">
+          <section id="faq" className="min-h-screen w-full py-24 flex items-center justify-center content-auto">
             <FAQSection />
           </section>
 
-          <section id="kontak" className="w-full">
+          <section id="kontak" className="w-full content-auto">
             <Footer />
           </section>
         </main>

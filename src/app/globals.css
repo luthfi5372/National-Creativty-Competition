@@ -47,13 +47,22 @@
 /* ========== GLOBAL RESET & BASE ========== */
 html {
   scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+  font-family: var(--font-sans, 'Inter', system-ui, -apple-system, sans-serif);
   overflow-x: hidden;
+}
+
+/* Optimize below-the-fold rendering */
+.content-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 600px;
 }
 
 /* ========== SCROLLBAR ========== */

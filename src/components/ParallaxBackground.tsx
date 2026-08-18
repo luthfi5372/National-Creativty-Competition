@@ -40,24 +40,28 @@ export default function ParallaxBackground() {
   const [items, setItems] = useState<any[]>([]);
 
   useEffect(() => {
-    setMounted(true);
-    
-    // Generate truly randomized elements on the client to avoid hydration mismatch and avoid structured rows
+    // Check mobile before generating elements to save mobile CPU/battery
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+
+    const count = window.innerWidth <= 768 ? 25 : 60;
     const generated = [];
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < count; i++) {
       const itemConfig = allIconsMapped[i % allIconsMapped.length];
       
       // True random positioning for natural, scattered distribution
       const x = Math.random() * 100; // 0 to 100 vw
       const y = Math.random() * 650; // 0 to 650 vh
       
-      const size = 32 + Math.floor(Math.random() * 68); // 32px to 100px
-      const depth = 1 + Math.floor(Math.random() * 4); // 1 to 4 depth
-      const opacity = 0.18 + (Math.random() * 0.22); // 18% to 40% opacity
-      const blur = depth > 3 ? "blur(2px)" : depth > 2 ? "blur(1px)" : "blur(0px)";
+      const size = 32 + Math.floor(Math.random() * 50); // 32px to 82px
+      const depth = 1 + Math.floor(Math.random() * 3); // 1 to 3 depth
+      const opacity = 0.15 + (Math.random() * 0.18); // 15% to 33% opacity
+      const blur = depth > 2 ? "blur(1px)" : "blur(0px)";
       const animClass = `float-anim-${(i % 3) + 1}`;
-      const animDelay = (Math.random() * 12).toFixed(1);
-      const animDuration = (18 + (Math.random() * 20)).toFixed(1);
+      const animDelay = (Math.random() * 8).toFixed(1);
+      const animDuration = (22 + (Math.random() * 16)).toFixed(1);
 
       generated.push({
         id: i,
@@ -75,12 +79,9 @@ export default function ParallaxBackground() {
       });
     }
     setItems(generated);
+    setMounted(true);
 
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
+    window.addEventListener("resize", checkMobile, { passive: true });
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
