@@ -56,6 +56,11 @@ export default function IntegratedLLMSDashboard() {
   const [entryCount, setEntryCount] = useState<number | null>(null);
   const [showShufflePopup, setShowShufflePopup] = useState(false);
 
+  // 🛡️ Security Log Full Preview Modal & Scroll States
+  const [selectedSecurityLog, setSelectedSecurityLog] = useState<any | null>(null);
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [allSecurityLogs, setAllSecurityLogs] = useState<any[]>([]);
+
   // ⚙️ Global Token Settings State
   const [globalTokenConfig, setGlobalTokenConfig] = useState<{
     tokenEnabled: boolean;
@@ -267,16 +272,21 @@ export default function IntegratedLLMSDashboard() {
           const violationC = attempt.violations_count ?? attempt.warnings_count ?? 0;
           violationSum += violationC;
           if (violationC > 0) {
+            const dateObj = new Date(attempt.updated_at || Date.now());
             logs.push({
               id: attempt.user_id + attempt.updated_at,
               userId: attempt.user_id,
               count: violationC,
-              time: new Date(attempt.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              time: dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              fullDate: dateObj.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'medium' }),
+              submitted: Boolean(attempt.submitted_at),
+              status: violationC >= 3 ? 'TERKUNCI (BLOCKED)' : 'PERINGATAN (WARNING)'
             });
           }
         });
       }
-      setSecurityLogs(logs.slice(0, 3));
+      setAllSecurityLogs(logs);
+      setSecurityLogs(logs);
       
       // Hitung akumulasi soal dari sesi yang sedang aktif
       const activeExams = examsData?.filter((s: any) => s.is_active) || [];
@@ -961,25 +971,69 @@ export default function IntegratedLLMSDashboard() {
                     <p className="text-[10px] text-emerald-500/70 font-bold mt-1 relative z-10">100% Integritas Terjaga</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {securityLogs.map(log => (
-                      <div key={log.id} className="p-3 bg-rose-500/5 border border-rose-200/40 rounded-2xl flex justify-between items-center transition-all duration-300 hover:bg-rose-500/10 hover:border-rose-500/30 shadow-sm shadow-rose-500/5">
-                        <div className="flex items-center gap-2.5">
-                          <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 animate-bounce" />
-                          <div>
-                            <p className="text-[11px] font-black text-slate-800 tracking-tight font-mono">{log.userId.substring(0,8)}...</p>
-                            <p className="text-[9px] text-rose-600 font-extrabold tracking-wide uppercase mt-0.5">{log.count}x pelanggaran</p>
+                  <div className="space-y-2.5">
+                    {/* Scrollable Container with Custom Scrollbar */}
+                    <div className="max-h-[260px] overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+                      {securityLogs.map((log, idx) => (
+                        <div
+                          key={log.id || idx}
+                          onClick={() => {
+                            setSelectedSecurityLog(log);
+                            setShowSecurityModal(true);
+                          }}
+                          className="p-3 bg-rose-500/5 hover:bg-rose-500/10 border border-rose-200/40 hover:border-rose-400/60 rounded-2xl flex justify-between items-center transition-all duration-200 shadow-sm shadow-rose-500/5 cursor-pointer group active:scale-[0.98]"
+                          title="Klik untuk melihat detail log pelanggaran"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-xl bg-rose-500/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                              <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-black text-slate-800 tracking-tight font-mono group-hover:text-rose-600 transition-colors">
+                                {log.userId}
+                              </p>
+                              <p className="text-[9px] text-rose-600 font-extrabold tracking-wide uppercase mt-0.5 flex items-center gap-1">
+                                <span>{log.count}x pelanggaran</span>
+                                {log.count >= 3 && (
+                                  <span className="px-1 py-0.2 bg-rose-600 text-white rounded text-[8px] font-black">TERKUNCI</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-[10px] font-black font-mono text-slate-500 bg-white border border-slate-200/60 px-2 py-0.5 rounded-md shadow-xs">
+                              {log.time}
+                            </span>
+                            <span className="text-[8px] text-indigo-500 font-black uppercase opacity-0 group-hover:opacity-100 transition-opacity">
+                              Detail →
+                            </span>
                           </div>
                         </div>
-                        <span className="text-[10px] font-black font-mono text-slate-400 bg-white border border-slate-200/50 px-2 py-0.5 rounded-md shadow-sm">{log.time}</span>
-                      </div>
-                    ))}
-                    <button
-                      onClick={downloadSecurityReport}
-                      className="w-full mt-2 py-3.5 bg-white border border-slate-200 hover:border-rose-200 hover:bg-rose-50/30 text-slate-600 hover:text-rose-600 text-xs font-black uppercase tracking-widest rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 shadow-sm"
-                    >
-                      <FileDown className="w-4 h-4" />Laporan .CSV
-                    </button>
+                      ))}
+                    </div>
+
+                    {/* Action Bar: Preview & Export */}
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        onClick={() => {
+                          if (allSecurityLogs.length > 0) {
+                            setSelectedSecurityLog(allSecurityLogs[0]);
+                          }
+                          setShowSecurityModal(true);
+                        }}
+                        className="py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-95"
+                      >
+                        <ShieldAlert className="w-3.5 h-3.5 text-indigo-600" />
+                        Preview Semua
+                      </button>
+                      <button
+                        onClick={downloadSecurityReport}
+                        className="py-2.5 bg-white border border-slate-200 hover:border-rose-200 hover:bg-rose-50/30 text-slate-600 hover:text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-95"
+                      >
+                        <FileDown className="w-3.5 h-3.5" />
+                        Laporan .CSV
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1690,6 +1744,131 @@ export default function IntegratedLLMSDashboard() {
               </button>
               <p className="text-center text-[10px] text-white/30 font-bold mt-3">Menutup otomatis dalam beberapa detik…</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 🛡️ INTERACTIVE SECURITY LOG DETAILS & FULL PREVIEW MODAL ─── */}
+      {showSecurityModal && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-100 rounded-[32px] w-full max-w-xl p-6 md:p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200 text-left max-h-[90vh] flex flex-col">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-rose-500/10 border border-rose-200 rounded-2xl flex items-center justify-center">
+                  <ShieldAlert className="w-5 h-5 text-rose-500" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-800 tracking-tight">Security Log Audit & Preview</h2>
+                  <p className="text-xs text-slate-400 font-bold">Pemantauan Pelanggaran Ujian CBT Live</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowSecurityModal(false);
+                  setSelectedSecurityLog(null);
+                }}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-sm font-bold transition-all"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Selected Item Inspector */}
+            {selectedSecurityLog && (
+              <div className="p-4 bg-gradient-to-br from-rose-50 to-orange-50 border border-rose-200/80 rounded-2xl shrink-0 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 bg-rose-200/50 px-2 py-0.5 rounded-md">
+                    Inspeksi Peserta Terpilih
+                  </span>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                    selectedSecurityLog.count >= 3 ? 'bg-rose-600 text-white' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {selectedSecurityLog.status || (selectedSecurityLog.count >= 3 ? 'TERKUNCI' : 'PERINGATAN')}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="bg-white/80 p-2.5 rounded-xl border border-rose-100">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase">ID Tiket / User ID</p>
+                    <p className="font-mono font-black text-slate-800 mt-0.5">{selectedSecurityLog.userId}</p>
+                  </div>
+                  <div className="bg-white/80 p-2.5 rounded-xl border border-rose-100">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase">Total Pelanggaran</p>
+                    <p className="font-mono font-black text-rose-600 mt-0.5">{selectedSecurityLog.count} Kali Terdeteksi</p>
+                  </div>
+                  <div className="bg-white/80 p-2.5 rounded-xl border border-rose-100">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase">Waktu Insiden Terakhir</p>
+                    <p className="font-mono font-bold text-slate-700 mt-0.5">{selectedSecurityLog.fullDate || selectedSecurityLog.time}</p>
+                  </div>
+                  <div className="bg-white/80 p-2.5 rounded-xl border border-rose-100">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase">Status Pengerjaan</p>
+                    <p className="font-bold text-slate-700 mt-0.5">{selectedSecurityLog.submitted ? 'Sudah Submit' : 'Sedang Mengerjakan'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Scrollable Full List */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[140px]">
+              <div className="flex items-center justify-between text-xs font-black text-slate-400 uppercase tracking-wider px-1 mb-1">
+                <span>Daftar Riwayat Pelanggaran ({allSecurityLogs.length})</span>
+                <span className="text-[10px] text-slate-350">Scroll untuk melihat semua</span>
+              </div>
+              {allSecurityLogs.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs font-bold">
+                  Belum ada log pelanggaran yang tercatat.
+                </div>
+              ) : (
+                allSecurityLogs.map((log, idx) => (
+                  <div
+                    key={log.id || idx}
+                    onClick={() => setSelectedSecurityLog(log)}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                      selectedSecurityLog?.id === log.id 
+                        ? 'bg-rose-100/70 border-rose-300 shadow-sm' 
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200/60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs ${
+                        log.count >= 3 ? 'bg-rose-600 text-white' : 'bg-rose-100 text-rose-600'
+                      }`}>
+                        {log.count}x
+                      </div>
+                      <div>
+                        <p className="text-xs font-black font-mono text-slate-800">{log.userId}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">{log.fullDate || log.time}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-black text-indigo-600 uppercase bg-white border border-slate-200 px-2.5 py-1 rounded-lg">
+                      Pilih
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer Modal */}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100 shrink-0">
+              <button
+                onClick={downloadSecurityReport}
+                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-2"
+              >
+                <FileDown className="w-4 h-4 text-slate-600" />
+                Unduh Semua CSV
+              </button>
+              <button
+                onClick={() => {
+                  setShowSecurityModal(false);
+                  setSelectedSecurityLog(null);
+                }}
+                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md active:scale-95"
+              >
+                Tutup
+              </button>
+            </div>
+
           </div>
         </div>
       )}
