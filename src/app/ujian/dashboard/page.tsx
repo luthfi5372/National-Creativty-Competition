@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
 import { generateTicketCode } from '@/lib/utils';
 import { 
   UserIcon, 
@@ -70,9 +70,7 @@ function ConfettiBlast() {
 
 export default function StudentDashboard() {
   const router = useRouter();
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabase = createClient();
 
   const [student, setStudent] = useState<any>(null);
   const [examDetail, setExamDetail] = useState<any>(null);
