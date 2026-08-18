@@ -711,7 +711,7 @@ export async function getLLMSTelemetryData() {
     // Ambil data cbt_attempts
     const { data: attemptsData, error: aError } = await client
       .from('cbt_attempts')
-      .select('warnings_count, submitted_at, user_id, updated_at')
+      .select('warnings_count, violations_count, submitted_at, user_id, updated_at')
       .order('updated_at', { ascending: false });
 
     const errorMsg = [
@@ -755,6 +755,7 @@ export async function getAdminBroadcasts() {
       .select('*')
       .neq('title', 'SYS_PORTAL_SETTINGS')
       .neq('title', 'SYSTEM_TIMELINE_CONFIG')
+      .neq('title', 'SYS_TOKEN_SETTINGS')
       .order('created_at', { ascending: false });
 
     return { data: data || [], error: error ? error.message : null };

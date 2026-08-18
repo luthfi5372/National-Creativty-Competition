@@ -264,12 +264,13 @@ export default function IntegratedLLMSDashboard() {
       if (attemptsData) {
         attemptsData.forEach((attempt: any) => {
           if (!attempt.submitted_at) onlineCount++;
-          violationSum += attempt.warnings_count || 0;
-          if (attempt.warnings_count > 0) {
+          const violationC = attempt.violations_count ?? attempt.warnings_count ?? 0;
+          violationSum += violationC;
+          if (violationC > 0) {
             logs.push({
               id: attempt.user_id + attempt.updated_at,
               userId: attempt.user_id,
-              count: attempt.warnings_count,
+              count: violationC,
               time: new Date(attempt.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             });
           }
