@@ -158,20 +158,20 @@ export default function ParallaxBackground() {
           style={{
             left: `${item.x}vw`,
             top: `${item.y}vh`,
-            opacity: isMobile ? item.opacity * 0.6 : item.opacity, // Clear presence on both desktop & mobile
-            filter: isMobile ? "blur(1.5px)" : item.blur, 
-            willChange: "transform",
+            opacity: isMobile ? item.opacity * 0.5 : item.opacity,
+            filter: isMobile ? "none" : item.blur, 
+            willChange: isMobile ? "auto" : "transform",
           }}
         >
           <div 
-            className={item.animClass}
+            className={isMobile ? "" : item.animClass}
             style={{
-              animationDelay: `${item.animDelay}s`,
-              animationDuration: `${item.animDuration}s`,
+              animationDelay: isMobile ? "0s" : `${item.animDelay}s`,
+              animationDuration: isMobile ? "0s" : `${item.animDuration}s`,
               transformOrigin: "center center"
             }}
           >
-            <item.Icon size={isMobile ? item.size * 0.6 : item.size} strokeWidth={1.5} />
+            <item.Icon size={isMobile ? item.size * 0.55 : item.size} strokeWidth={1.5} />
           </div>
         </div>
       ))}

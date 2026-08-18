@@ -17,10 +17,19 @@ const FLOATING_ITEMS = [
 ];
 
 interface LoginFormClientProps {
-  initialStats: GlobalStats;
+  initialStats?: GlobalStats;
 }
 
-export default function LoginFormClient({ initialStats }: LoginFormClientProps) {
+const DEFAULT_FALLBACK_STATS: GlobalStats = {
+  totalParticipants: 250,
+  provinces: 34,
+  categories: 4,
+  categoryBreakdown: { "Olimpiade MIPA": 100, "Speech Contest": 50, "LKTI Nasional": 60, "MTQ Nasional": 40 },
+  regionStats: { "Sumatera": 50, "Jawa": 120, "Kalimantan": 30, "Sulawesi": 30, "Papua": 10, "Bali & Nusa Tenggara": 10 },
+  detailedProvinceStats: {}
+};
+
+export default function LoginFormClient({ initialStats = DEFAULT_FALLBACK_STATS }: LoginFormClientProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);

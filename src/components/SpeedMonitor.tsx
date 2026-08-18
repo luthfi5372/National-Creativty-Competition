@@ -14,6 +14,11 @@ export default function SpeedMonitor() {
   const lastTime = useRef(typeof performance !== 'undefined' ? performance.now() : 0);
 
   useEffect(() => {
+    // Skip loop completely on mobile to preserve 100% mobile CPU for interaction
+    if (typeof window !== "undefined" && window.innerWidth <= 640) {
+      return;
+    }
+
     // FPS Calculation logic
     const updateStats = () => {
       frameCount.current++;
