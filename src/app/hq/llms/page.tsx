@@ -249,6 +249,59 @@ export default function IntegratedLLMSDashboard() {
     router.push('/login');
   };
 
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
+
+  const handleUnlockParticipant = async (userId: string) => {
+    if (!userId) return;
+    setIsProcessingAction(true);
+    try {
+      const { unlockCbtParticipant } = await import("@/app/actions/auth");
+      const { success, error } = await unlockCbtParticipant("", userId);
+      if (error || !success) throw new Error(error || "Gagal");
+      showToast(`Akses peserta ${userId} berhasil dibuka! Pelanggaran di-reset ke 0.`, "success");
+      
+      // Update selectedSecurityLog state locally
+      if (selectedSecurityLog && selectedSecurityLog.userId === userId) {
+        setSelectedSecurityLog((prev: any) => ({
+          ...prev,
+          count: 0,
+          status: 'AKTIF (DIIZINKAN)'
+        }));
+      }
+
+      fetchTelemetryData();
+    } catch (err: any) {
+      showToast(`Gagal membuka akses: ${err.message}`, "error");
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  const handleForceSubmitParticipant = async (userId: string) => {
+    if (!userId) return;
+    setIsProcessingAction(true);
+    try {
+      const { forceSubmitCbtParticipant } = await import("@/app/actions/auth");
+      const { success, error } = await forceSubmitCbtParticipant("", userId);
+      if (error || !success) throw new Error(error || "Gagal");
+      showToast(`Jawaban peserta ${userId} berhasil dipaksa kumpulkan (Submitted).`, "success");
+
+      // Update selectedSecurityLog state locally
+      if (selectedSecurityLog && selectedSecurityLog.userId === userId) {
+        setSelectedSecurityLog((prev: any) => ({
+          ...prev,
+          submitted: true
+        }));
+      }
+
+      fetchTelemetryData();
+    } catch (err: any) {
+      showToast(`Gagal submit jawaban: ${err.message}`, "error");
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
   const lastFetchTimeRef = React.useRef<number>(0);
   const fetchTimeoutRef = React.useRef<any>(null);
 
@@ -1775,36 +1828,59 @@ export default function IntegratedLLMSDashboard() {
               </button>
             </div>
 
-            {/* Selected Item Inspector */}
+            {/* Selected Item Inspector with Direct Action Buttons */}
             {selectedSecurityLog && (
-              <div className="p-4 bg-gradient-to-br from-rose-50 to-orange-50 border border-rose-200/80 rounded-2xl shrink-0 space-y-3">
+              <div className="p-4 bg-gradient-to-br from-rose-50 to-orange-50 border border-rose-200/80 rounded-2xl shrink-0 space-y-3 shadow-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 bg-rose-200/50 px-2 py-0.5 rounded-md">
                     Inspeksi Peserta Terpilih
                   </span>
                   <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
-                    selectedSecurityLog.count >= 3 ? 'bg-rose-600 text-white' : 'bg-amber-100 text-amber-800'
+                    selectedSecurityLog.count >= 3 ? 'bg-rose-600 text-white' : (selectedSecurityLog.count === 0 ? 'bg-emerald-600 text-white' : 'bg-amber-100 text-amber-800')
                   }`}>
-                    {selectedSecurityLog.status || (selectedSecurityLog.count >= 3 ? 'TERKUNCI' : 'PERINGATAN')}
+                    {selectedSecurityLog.status || (selectedSecurityLog.count >= 3 ? 'TERKUNCI (BLOCKED)' : (selectedSecurityLog.count === 0 ? 'AKTIF (DIIZINKAN)' : 'PERINGATAN (WARNING)'))}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="bg-white/80 p-2.5 rounded-xl border border-rose-100">
+                <div className="grid grid-cols-2 gap-2.5 text-xs">
+                  <div className="bg-white/90 p-2.5 rounded-xl border border-rose-100/80">
                     <p className="text-[9px] font-bold text-slate-400 uppercase">ID Tiket / User ID</p>
                     <p className="font-mono font-black text-slate-800 mt-0.5">{selectedSecurityLog.userId}</p>
                   </div>
-                  <div className="bg-white/80 p-2.5 rounded-xl border border-rose-100">
+                  <div className="bg-white/90 p-2.5 rounded-xl border border-rose-100/80">
                     <p className="text-[9px] font-bold text-slate-400 uppercase">Total Pelanggaran</p>
                     <p className="font-mono font-black text-rose-600 mt-0.5">{selectedSecurityLog.count} Kali Terdeteksi</p>
                   </div>
-                  <div className="bg-white/80 p-2.5 rounded-xl border border-rose-100">
+                  <div className="bg-white/90 p-2.5 rounded-xl border border-rose-100/80">
                     <p className="text-[9px] font-bold text-slate-400 uppercase">Waktu Insiden Terakhir</p>
                     <p className="font-mono font-bold text-slate-700 mt-0.5">{selectedSecurityLog.fullDate || selectedSecurityLog.time}</p>
                   </div>
-                  <div className="bg-white/80 p-2.5 rounded-xl border border-rose-100">
+                  <div className="bg-white/90 p-2.5 rounded-xl border border-rose-100/80">
                     <p className="text-[9px] font-bold text-slate-400 uppercase">Status Pengerjaan</p>
-                    <p className="font-bold text-slate-700 mt-0.5">{selectedSecurityLog.submitted ? 'Sudah Submit' : 'Sedang Mengerjakan'}</p>
+                    <p className="font-bold text-slate-700 mt-0.5">{selectedSecurityLog.submitted ? '✅ Sudah Submit' : '⏳ Sedang Mengerjakan'}</p>
                   </div>
+                </div>
+
+                {/* Direct Action Control Buttons */}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={() => handleUnlockParticipant(selectedSecurityLog.userId)}
+                    disabled={isProcessingAction}
+                    className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    Buka Blokir (Reset)
+                  </button>
+
+                  {!selectedSecurityLog.submitted && (
+                    <button
+                      onClick={() => handleForceSubmitParticipant(selectedSecurityLog.userId)}
+                      disabled={isProcessingAction}
+                      className="flex-1 py-2.5 px-3 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      Paksa Kumpulkan
+                    </button>
+                  )}
                 </div>
               </div>
             )}
