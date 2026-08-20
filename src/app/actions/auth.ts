@@ -1131,5 +1131,137 @@ export async function saveTokenSettings(settings: {
   }
 }
 
+/** Mengambil data CCTV Monitor Per Sesi Ujian (Bypass RLS via Service Role & Cross-Match) */
+export async function getCbtMonitorData(examId: string) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    // 1. Ambil info ujian
+    const { data: examData } = await client
+      .from('cbt_exams')
+      .select('id, title, token, duration_minutes, is_active')
+      .eq('id', examId)
+      .maybeSingle();
+
+    // 2. Ambil attempts untuk exam ini
+    let { data: attempts, error: aError } = await client
+      .from('cbt_attempts')
+      .select('*')
+      .eq('exam_id', examId)
+      .order('updated_at', { ascending: false });
+
+    // Fallback: Jika tidak ada attempts dengan exam_id spesifik, tapi ada data attempts global (misal id format beda)
+    if ((!attempts || attempts.length === 0)) {
+      const { data: allAttempts } = await client
+        .from('cbt_attempts')
+        .select('*')
+        .order('updated_at', { ascending: false });
+      
+      if (allAttempts && allAttempts.length > 0) {
+        // Cek apakah ada attempts yang cocok dengan exam_id atau judul
+        const matched = allAttempts.filter((a: any) => 
+          String(a.exam_id).toLowerCase() === String(examId).toLowerCase() || !a.exam_id
+        );
+        if (matched.length > 0) {
+          attempts = matched;
+        } else {
+          // Tampilkan semua attempts jika hanya ada 1 sesi aktif atau sesi simulasi
+          attempts = allAttempts;
+        }
+      }
+    }
+
+    // 3. Ambil data profil & competition_entries untuk enrich nama & sekolah
+    const { data: entriesData } = await client
+      .from('competition_entries')
+      .select('id, user_id, full_name, school_name, school, category, competition_type, notes, email, nisn');
+
+    const { data: profilesData } = await client
+      .from('profiles')
+      .select('id, full_name, email, school_name');
+
+    return {
+      exam: examData || null,
+      attempts: attempts || [],
+      entries: entriesData || [],
+      profiles: profilesData || [],
+      error: null
+    };
+  } catch (err: any) {
+    console.error("[Server Action] Exception getCbtMonitorData:", err);
+    return {
+      exam: null,
+      attempts: [],
+      entries: [],
+      profiles: [],
+      error: err.message || "Gagal mengambil data CCTV monitor."
+    };
+  }
+}
+
+/** Membuka blokir akses peserta ujian CBT (Bypass RLS) */
+export async function unlockCbtParticipant(examId: string, userId: string) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { error } = await client
+      .from('cbt_attempts')
+      .update({ violations_count: 0, warnings_count: 0, updated_at: new Date().toISOString() })
+      .eq('user_id', userId);
+
+    if (error) throw error;
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception unlockCbtParticipant:", err);
+    return { success: false, error: err.message || "Gagal membuka blokir peserta." };
+  }
+}
+
+/** Memaksa kumpulkan (submit) jawaban ujian peserta CBT (Bypass RLS) */
+export async function forceSubmitCbtParticipant(examId: string, userId: string) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { error } = await client
+      .from('cbt_attempts')
+      .update({ 
+        submitted_at: new Date().toISOString(), 
+        status: 'submitted',
+        updated_at: new Date().toISOString() 
+      })
+      .eq('user_id', userId);
+
+    if (error) throw error;
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception forceSubmitCbtParticipant:", err);
+    return { success: false, error: err.message || "Gagal force submit peserta." };
+  }
+}
+
 
 

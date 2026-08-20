@@ -79,20 +79,21 @@ export default function LiveMonitor() {
     if (!examId || examId === 'undefined') return;
     setIsRefreshing(true);
     try {
-      // Fetch attempts
-      const { data: attempts } = await supabase
-        .from('cbt_attempts')
-        .select('*')
-        .eq('exam_id', examId)
-        .order('updated_at', { ascending: false });
+      const { getCbtMonitorData } = await import('@/app/actions/auth');
+      const { exam, attempts, entries, profiles, error } = await getCbtMonitorData(examId);
 
-      // Fetch participant info map from competition_entries
-      const { data: entriesData } = await supabase
-        .from('competition_entries')
-        .select('id, full_name, school_name, notes');
+      if (exam) {
+        setExamInfo({
+          title: exam.title || 'Sesi CBT',
+          token: exam.token || '-',
+          duration_minutes: exam.duration_minutes || 90
+        });
+      }
 
+      // Build comprehensive participant mapping
       const pMap: Record<string, any> = {};
-      (entriesData || []).forEach(entry => {
+
+      (entries || []).forEach((entry: any) => {
         let customTicketCode = "";
         if (entry.notes) {
           try {
@@ -106,27 +107,56 @@ export default function LiveMonitor() {
         const generatedTicketCode = `NCC-${generateTicketCode(entry.id)}`.toUpperCase();
         
         const info = {
-          full_name: entry.full_name,
-          school_origin: entry.school_name,
-          branch: ""
+          full_name: entry.full_name || "Peserta NCC",
+          school_origin: entry.school_name || entry.school || "-",
+          branch: entry.competition_type || entry.category || ""
         };
 
-        // 1. Map by generated ticket code
+        // Map by generated ticket code
         pMap[generatedTicketCode] = info;
         pMap[generatedTicketCode.replace("NCC-", "")] = info;
 
-        // 2. Map by custom ticket code if available
+        // Map by custom ticket code if available
         if (customTicketCode) {
           pMap[customTicketCode] = info;
           pMap[customTicketCode.replace("NCC-", "")] = info;
         }
+
+        // Map by user_id
+        if (entry.user_id) {
+          pMap[String(entry.user_id).toUpperCase()] = info;
+          pMap[String(entry.user_id).toLowerCase()] = info;
+        }
+
+        // Map by nisn
+        if (entry.nisn) {
+          pMap[String(entry.nisn)] = info;
+        }
+
+        // Map by email
+        if (entry.email) {
+          pMap[String(entry.email).toLowerCase()] = info;
+        }
       });
+
+      (profiles || []).forEach((prof: any) => {
+        if (prof.id && !pMap[prof.id]) {
+          pMap[prof.id] = {
+            full_name: prof.full_name || "Peserta",
+            school_origin: prof.school_name || "-",
+            branch: ""
+          };
+        }
+      });
+
       setParticipantMap(pMap);
 
       if (attempts) {
         setParticipants(attempts);
         recalcStats(attempts);
       }
+    } catch (err: any) {
+      console.error("Gagal memuat data CCTV:", err);
     } finally {
       setIsRefreshing(false);
     }
@@ -135,35 +165,16 @@ export default function LiveMonitor() {
   useEffect(() => {
     if (!examId || examId === 'undefined') return;
 
-    const loadExam = async () => {
-      const { data } = await supabase
-        .from('cbt_exams')
-        .select('title, token, duration_minutes')
-        .eq('id', examId)
-        .maybeSingle();
-      if (data) setExamInfo(data);
-    };
-    loadExam();
     fetchData();
 
     const channel = supabase.channel(`live-cctv-${examId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cbt_attempts' }, (payload) => {
-        if (payload.new && (payload.new as any).exam_id === examId) {
-          setParticipants(prev => {
-            const updated = payload.new as Participant;
-            let next = [...prev];
-            const idx = next.findIndex(p => p.user_id === updated.user_id);
-            if (idx !== -1) next[idx] = updated; else next.push(updated);
-            next.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-            recalcStats(next);
-            return next;
-          });
-        }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cbt_attempts' }, () => {
+        fetchData();
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [examId, fetchData, recalcStats]);
+  }, [examId, fetchData]);
 
   // Modal & Toast state
   const [unlockUserId, setUnlockUserId] = useState<string | null>(null);
@@ -180,11 +191,11 @@ export default function LiveMonitor() {
     if (!unlockUserId) return;
     setIsProcessing(true);
     try {
-      const { error } = await supabase.from('cbt_attempts')
-        .update({ violations_count: 0, updated_at: new Date().toISOString() })
-        .eq('user_id', unlockUserId).eq('exam_id', examId);
-      if (error) throw error;
-      showToast(`Akses ${unlockUserId} berhasil dibuka! Minta peserta refresh.`, 'success');
+      const { unlockCbtParticipant } = await import('@/app/actions/auth');
+      const { success, error } = await unlockCbtParticipant(examId, unlockUserId);
+      if (error || !success) throw new Error(error || "Gagal");
+      showToast(`Akses ${unlockUserId} berhasil dibuka! Peserta dapat melanjutkan ujian.`, 'success');
+      fetchData();
     } catch (err: any) {
       showToast('Gagal: ' + err.message, 'error');
     } finally {
@@ -197,11 +208,11 @@ export default function LiveMonitor() {
     if (!forceSubmitUserId) return;
     setIsProcessing(true);
     try {
-      const { error } = await supabase.from('cbt_attempts')
-        .update({ submitted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-        .eq('user_id', forceSubmitUserId).eq('exam_id', examId);
-      if (error) throw error;
-      showToast(`Jawaban ${forceSubmitUserId} dipaksa dikumpulkan!`, 'success');
+      const { forceSubmitCbtParticipant } = await import('@/app/actions/auth');
+      const { success, error } = await forceSubmitCbtParticipant(examId, forceSubmitUserId);
+      if (error || !success) throw new Error(error || "Gagal");
+      showToast(`Jawaban ${forceSubmitUserId} berhasil dipaksa kumpulkan!`, 'success');
+      fetchData();
     } catch (err: any) {
       showToast('Gagal: ' + err.message, 'error');
     } finally {
