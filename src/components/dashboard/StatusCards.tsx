@@ -39,6 +39,44 @@ export default function StatusCards({
   const [isSavingUrl, setIsSavingUrl] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isEditingSubmission, setIsEditingSubmission] = useState(false);
+  const [paymentFile, setPaymentFile] = useState<File | null>(null);
+  const [isUploadingPayment, setIsUploadingPayment] = useState(false);
+
+  // 💳 DYNAMIC PAYMENT DETAILS CONFIG
+  const [dynamicPaymentConfig, setDynamicPaymentConfig] = useState<any>({
+    bankName: "Bank Mandiri",
+    bankBadge: "MANDIRI",
+    accountNumber: "123-456-789-0123",
+    accountHolder: "Panitia National Creativity Competition",
+    amount: 150000,
+    amountFormatted: "Rp 150.000",
+    description: "Untuk mengaktifkan kepesertaan Anda di cabang {category}, silakan lakukan transfer administrasi pendaftaran:"
+  });
+
+  useEffect(() => {
+    const loadPaymentConfig = async () => {
+      try {
+        const { getPaymentConfig } = await import('@/app/actions/auth');
+        const res = await getPaymentConfig();
+        if (res && res.data) {
+          setDynamicPaymentConfig(res.data);
+        }
+      } catch (err) {
+        console.error("Gagal load payment config:", err);
+      }
+    };
+    loadPaymentConfig();
+
+    const channel = supabase.channel('realtime-payment-config')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, (payload) => {
+        if (payload.new && (payload.new as any).title === 'SYS_PAYMENT_CONFIG') {
+          loadPaymentConfig();
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
   
   // 🌊 DYNAMIC REGISTRATION OPEN CALCULATION FROM settings/waves
   const activeWave = portalWaves.find((w: any) => w.status === "Aktif");
@@ -313,9 +351,6 @@ export default function StatusCards({
     }
   };
 
-  const [isUploadingPayment, setIsUploadingPayment] = useState(false);
-  const [paymentFile, setPaymentFile] = useState<File | null>(null);
-
   const handleUploadPaymentProof = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!paymentFile) return showToast("Mohon pilih file bukti transfer terlebih dahulu!", "error");
@@ -462,67 +497,100 @@ export default function StatusCards({
 
       {userEntry && userEntry.payment_status !== 'Verified' && userEntry.payment_status !== 'Pending' && userEntry.payment_status !== 'Rejected' && (
         isPaymentRequired ? (
-          <div className="bg-white border border-slate-200 shadow-xl shadow-slate-100 rounded-3xl p-6 relative overflow-hidden group">
-            {/* Elegant Background Accent */}
-            <div className="absolute top-0 right-0 w-28 h-28 bg-indigo-50 rounded-full blur-2xl pointer-events-none group-hover:scale-110 transition-transform duration-700"></div>
+          <div className="bg-gradient-to-br from-white via-indigo-50/20 to-purple-50/30 border-2 border-indigo-100/80 shadow-[0_12px_40px_rgba(79,70,229,0.08)] rounded-[28px] p-6 relative overflow-hidden group transition-all">
+            {/* Colorful Dynamic Glowing Blobs */}
+            <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-br from-indigo-400/20 to-purple-400/20 rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform duration-700"></div>
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-pink-400/15 to-blue-400/15 rounded-full blur-xl pointer-events-none"></div>
 
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
-                </svg>
+            {/* Header Badge & Title */}
+            <div className="flex items-center justify-between gap-3 mb-4 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base tracking-tight leading-tight">Pembayaran Lomba</h3>
+                  <p className="text-[10px] text-slate-400 font-bold">Verifikasi Berkas & Tagihan</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-black text-slate-800 text-sm leading-tight">Pembayaran Lomba</h3>
-                <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[8px] font-black uppercase tracking-widest rounded">Administrasi Wajib</span>
-              </div>
+              <span className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-[9px] font-black uppercase tracking-widest rounded-full shadow-sm shadow-indigo-200">
+                Wajib
+              </span>
             </div>
 
-            <p className="text-[11px] text-slate-500 font-medium leading-relaxed mb-4">
-              Untuk mengaktifkan kepesertaan Anda di cabang <strong className="text-indigo-600">{userEntry.competition_type || userEntry.category}</strong>, silakan lakukan transfer administrasi pendaftaran:
+            {/* Dynamic Custom Description */}
+            <p className="text-[11px] text-slate-600 font-medium leading-relaxed mb-4 relative z-10">
+              {(() => {
+                const defaultDesc = "Untuk mengaktifkan kepesertaan Anda di cabang {category}, silakan lakukan transfer administrasi pendaftaran:";
+                const rawDesc = dynamicPaymentConfig?.description || defaultDesc;
+                const catName = userEntry.competition_type || userEntry.category || "Kompetisi";
+                return rawDesc.replace("{category}", catName);
+              })()}
             </p>
 
-            {/* Bank Card Info */}
-            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-3 mb-4">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-medium">Bank Tujuan</span>
-                <span className="font-extrabold text-slate-700 flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 bg-blue-600 text-white font-black text-[9px] rounded">MANDIRI</span>
-                  Bank Mandiri
+            {/* Modern Colorful Bank Info Card */}
+            <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4.5 border border-indigo-500/20 shadow-xl shadow-indigo-950/10 space-y-3.5 mb-4 relative overflow-hidden">
+              {/* Card Hologram Line */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-xl pointer-events-none"></div>
+
+              {/* Bank & Badge */}
+              <div className="flex justify-between items-center text-xs relative z-10">
+                <span className="text-indigo-200/80 font-medium text-[11px]">Bank Tujuan</span>
+                <span className="font-black text-white flex items-center gap-1.5">
+                  <span className="px-2 py-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-black text-[9px] rounded-md tracking-wider shadow-xs">
+                    {dynamicPaymentConfig?.bankBadge || "MANDIRI"}
+                  </span>
+                  {dynamicPaymentConfig?.bankName || "Bank Mandiri"}
                 </span>
               </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-medium">Nomor Rekening</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono font-black text-slate-800 tracking-wider">123-456-789-0123</span>
+
+              {/* Account Number */}
+              <div className="flex justify-between items-center text-xs relative z-10 bg-white/10 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10">
+                <span className="text-indigo-200/80 font-medium text-[11px]">No. Rekening</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-black text-amber-300 text-sm tracking-wider">
+                    {dynamicPaymentConfig?.accountNumber || "123-456-789-0123"}
+                  </span>
                   <button 
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText("1234567890123");
+                      const num = (dynamicPaymentConfig?.accountNumber || "1234567890123").replace(/[^0-9]/g, '');
+                      navigator.clipboard.writeText(num);
                       showToast("Nomor rekening berhasil disalin!", "success");
                     }}
-                    className="p-1 hover:bg-slate-200 rounded-md text-slate-400 hover:text-slate-600 transition-colors"
+                    className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-all active:scale-90"
                     title="Salin Nomor Rekening"
                   >
-                    <Copy size={12} />
+                    <Copy size={13} />
                   </button>
                 </div>
               </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-medium">Atas Nama (A.N.)</span>
-                <span className="font-bold text-slate-800">Panitia National Creativity Competition</span>
+
+              {/* Account Holder */}
+              <div className="flex justify-between items-center text-xs relative z-10">
+                <span className="text-indigo-200/80 font-medium text-[11px]">Atas Nama</span>
+                <span className="font-bold text-white text-right truncate max-w-[190px]">
+                  {dynamicPaymentConfig?.accountHolder || "Panitia National Creativity Competition"}
+                </span>
               </div>
-              <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-200/50">
-                <span className="text-slate-400 font-medium">Biaya Pendaftaran</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-black text-indigo-600 text-sm">Rp 150.000</span>
+
+              {/* Total Amount */}
+              <div className="flex justify-between items-center pt-2.5 border-t border-white/15 relative z-10">
+                <span className="text-indigo-200/80 font-medium text-[11px]">Biaya Pendaftaran</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-emerald-400 text-base">
+                    {dynamicPaymentConfig?.amountFormatted || "Rp 150.000"}
+                  </span>
                   <button 
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText("150000");
-                      showToast("Biaya pendaftaran disalin!", "success");
+                      const amountVal = String(dynamicPaymentConfig?.amount || 150000);
+                      navigator.clipboard.writeText(amountVal);
+                      showToast("Nominal pembayaran disalin!", "success");
                     }}
-                    className="p-1 hover:bg-slate-200 rounded-md text-slate-400 hover:text-slate-600 transition-colors"
+                    className="p-1 bg-white/20 hover:bg-white/30 rounded-md text-white transition-all active:scale-90"
                     title="Salin Nominal"
                   >
                     <Copy size={12} />
@@ -532,12 +600,12 @@ export default function StatusCards({
             </div>
 
             {/* Drag and Drop Uploader */}
-            <form onSubmit={handleUploadPaymentProof} className="space-y-4">
+            <form onSubmit={handleUploadPaymentProof} className="space-y-3 relative z-10">
               <div className="relative">
-                <div className={`border-2 border-dashed rounded-2xl p-5 text-center transition-all cursor-pointer relative ${
+                <div className={`border-2 border-dashed rounded-2xl p-4.5 text-center transition-all cursor-pointer relative ${
                   paymentFile 
-                    ? 'border-emerald-300 bg-emerald-50/20' 
-                    : 'border-slate-200 hover:border-indigo-300 bg-slate-50/50'
+                    ? 'border-emerald-400 bg-emerald-50/50 shadow-sm shadow-emerald-100' 
+                    : 'border-indigo-200/80 hover:border-indigo-400 bg-indigo-50/20 hover:bg-indigo-50/40'
                 }`}>
                   <input 
                     required 
@@ -546,16 +614,16 @@ export default function StatusCards({
                     className="absolute inset-0 opacity-0 cursor-pointer z-10" 
                     onChange={(e) => setPaymentFile(e.target.files?.[0] || null)}
                   />
-                  <div className="flex flex-col items-center gap-2">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-sm ${
+                  <div className="flex flex-col items-center gap-1.5">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${
                       paymentFile 
-                        ? 'bg-emerald-100 text-emerald-600' 
-                        : 'bg-white text-slate-400 border border-slate-100'
+                        ? 'bg-emerald-500 text-white' 
+                        : 'bg-indigo-600 text-white shadow-indigo-200'
                     }`}>
-                      {paymentFile ? <CheckCircle2 size={16} /> : <Upload size={16} />}
+                      {paymentFile ? <CheckCircle2 size={18} /> : <Upload size={18} />}
                     </div>
                     <div>
-                      <p className={`text-[11px] font-bold ${paymentFile ? 'text-emerald-700' : 'text-slate-600'}`}>
+                      <p className={`text-xs font-bold ${paymentFile ? 'text-emerald-800' : 'text-slate-800'}`}>
                         {paymentFile ? paymentFile.name : "Unggah Bukti Transfer"}
                       </p>
                       <p className="text-[9px] text-slate-400 font-medium mt-0.5">
@@ -569,15 +637,15 @@ export default function StatusCards({
               <button 
                 type="submit" 
                 disabled={isUploadingPayment} 
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-3 rounded-xl transition-all shadow-md text-xs tracking-wider uppercase disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-[#5145cd] via-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-200 text-xs tracking-wider uppercase disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-98"
               >
                 {isUploadingPayment ? (
                   <>
-                    <Loader2 size={14} className="animate-spin" />
+                    <Loader2 size={15} className="animate-spin" />
                     Memproses Bukti...
                   </>
                 ) : (
-                  "Kirim Bukti Pembayaran"
+                  "KIRIM BUKTI PEMBAYARAN"
                 )}
               </button>
             </form>

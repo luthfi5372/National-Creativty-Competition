@@ -36,6 +36,18 @@ export default function SettingsDashboard() {
   const [paymentRequirementStage, setPaymentRequirementStage] = useState('registration');
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
+  // States for Custom Payment Info (Bank, Rekening, Nominal, Deskripsi)
+  const [paymentConfig, setPaymentConfig] = useState({
+    bankName: "Bank Mandiri",
+    bankBadge: "MANDIRI",
+    accountNumber: "123-456-789-0123",
+    accountHolder: "Panitia National Creativity Competition",
+    amount: 150000,
+    amountFormatted: "Rp 150.000",
+    description: "Untuk mengaktifkan kepesertaan Anda di cabang {category}, silakan lakukan transfer administrasi pendaftaran:"
+  });
+  const [isSavingPaymentConfig, setIsSavingPaymentConfig] = useState(false);
+
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -119,6 +131,17 @@ export default function SettingsDashboard() {
           } catch (e) {
             console.error("Gagal parsing portal settings:", e);
           }
+        }
+
+        // Ambil konfigurasi rekening & deskripsi pembayaran
+        try {
+          const { getPaymentConfig } = await import('@/app/actions/auth');
+          const pRes = await getPaymentConfig();
+          if (pRes && pRes.data) {
+            setPaymentConfig(pRes.data);
+          }
+        } catch (pErr) {
+          console.error("Gagal memuat payment config:", pErr);
         }
       } catch (err: any) {
         console.error("Gagal memuat pengaturan:", err);
@@ -704,8 +727,8 @@ export default function SettingsDashboard() {
           </div>
 
           {/* 1.5. KONFIGURASI KEWAJIBAN PEMBAYARAN */}
-          <div className="bg-white rounded-[24px] p-8 shadow-sm border border-gray-100">
-            <div className="mb-6">
+          <div className="bg-white rounded-[24px] p-8 shadow-sm border border-gray-100 space-y-6">
+            <div>
               <h3 className="text-xl font-black text-slate-800">Kewajiban Pembayaran Lomba</h3>
               <p className="text-sm text-slate-500 mt-1">Tentukan pada fase/tahap mana peserta diwajibkan untuk menyelesaikan administrasi pembayaran.</p>
             </div>
@@ -791,6 +814,111 @@ export default function SettingsDashboard() {
                   </motion.button>
                 );
               })}
+            </div>
+
+            {/* 💳 KUSTOMISASI REKENING & DESKRIPSI PEMBAYARAN */}
+            <div className="pt-6 border-t border-slate-100">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h4 className="text-base font-black text-slate-800 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
+                    Pengaturan Rekening & Deskripsi Tagihan Peserta
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">Sesuaikan nomor rekening, nama bank, nominal, dan instruksi yang tampil di dashboard peserta.</p>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-indigo-50/40 to-slate-50/70 p-6 rounded-2xl border border-indigo-100/60 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Nama Bank</label>
+                    <input 
+                      type="text" 
+                      value={paymentConfig.bankName} 
+                      onChange={(e) => setPaymentConfig(prev => ({ ...prev, bankName: e.target.value, bankBadge: e.target.value.split(" ")[1]?.toUpperCase() || e.target.value.toUpperCase() }))}
+                      placeholder="Contoh: Bank Mandiri" 
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Nomor Rekening</label>
+                    <input 
+                      type="text" 
+                      value={paymentConfig.accountNumber} 
+                      onChange={(e) => setPaymentConfig(prev => ({ ...prev, accountNumber: e.target.value }))}
+                      placeholder="Contoh: 123-456-789-0123" 
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Atas Nama (A.N.)</label>
+                    <input 
+                      type="text" 
+                      value={paymentConfig.accountHolder} 
+                      onChange={(e) => setPaymentConfig(prev => ({ ...prev, accountHolder: e.target.value }))}
+                      placeholder="Contoh: Panitia National Creativity Competition" 
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Biaya / Nominal (Rp)</label>
+                    <input 
+                      type="number" 
+                      value={paymentConfig.amount} 
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        setPaymentConfig(prev => ({ 
+                          ...prev, 
+                          amount: val,
+                          amountFormatted: `Rp ${val.toLocaleString('id-ID')}`
+                        }));
+                      }}
+                      placeholder="150000" 
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">
+                      Instruksi / Deskripsi Singkat <span className="text-slate-400 font-normal">(Gunakan {"{category}"} untuk nama cabang)</span>
+                    </label>
+                    <input 
+                      type="text" 
+                      value={paymentConfig.description} 
+                      onChange={(e) => setPaymentConfig(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Untuk mengaktifkan kepesertaan Anda di cabang {category}, silakan transfer:" 
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={async () => {
+                      setIsSavingPaymentConfig(true);
+                      try {
+                        const { savePaymentConfig } = await import('@/app/actions/auth');
+                        const res = await savePaymentConfig(paymentConfig);
+                        if (res.error) throw new Error(res.error);
+                        setToastMessage("Pengaturan rekening & deskripsi pembayaran berhasil disimpan!");
+                        setTimeout(() => setToastMessage(""), 3000);
+                      } catch (err: any) {
+                        setToastMessage(`Gagal: ${err.message}`);
+                        setTimeout(() => setToastMessage(""), 3500);
+                      } finally {
+                        setIsSavingPaymentConfig(false);
+                      }
+                    }}
+                    disabled={isSavingPaymentConfig}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isSavingPaymentConfig ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    Simpan Rincian Pembayaran
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 

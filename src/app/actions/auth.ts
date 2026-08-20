@@ -1131,6 +1131,109 @@ export async function saveTokenSettings(settings: {
   }
 }
 
+/** Mengambil konfigurasi rekening & instruksi pembayaran kustom (Bypass RLS) */
+export async function getPaymentConfig() {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { data: record } = await client
+      .from('announcements')
+      .select('content')
+      .eq('title', 'SYS_PAYMENT_CONFIG')
+      .maybeSingle();
+
+    if (record && record.content) {
+      try {
+        const parsed = JSON.parse(record.content);
+        return { data: parsed, error: null };
+      } catch (e) {}
+    }
+
+    // Default configuration jika belum diset
+    return {
+      data: {
+        bankName: "Bank Mandiri",
+        bankBadge: "MANDIRI",
+        accountNumber: "123-456-789-0123",
+        accountHolder: "Panitia National Creativity Competition",
+        amount: 150000,
+        amountFormatted: "Rp 150.000",
+        description: "Untuk mengaktifkan kepesertaan Anda di cabang {category}, silakan lakukan transfer administrasi pendaftaran:"
+      },
+      error: null
+    };
+  } catch (err: any) {
+    console.error("[Server Action] Exception getPaymentConfig:", err);
+    return { data: null, error: err.message || "Gagal mengambil config pembayaran." };
+  }
+}
+
+/** Menyimpan konfigurasi rekening & instruksi pembayaran kustom (Bypass RLS) */
+export async function savePaymentConfig(config: {
+  bankName: string;
+  bankBadge?: string;
+  accountNumber: string;
+  accountHolder: string;
+  amount: number;
+  amountFormatted?: string;
+  description?: string;
+}) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const payload = {
+      title: 'SYS_PAYMENT_CONFIG',
+      message: 'SYS_PAYMENT_CONFIG',
+      content: JSON.stringify({
+        ...config,
+        updatedAt: new Date().toISOString()
+      }),
+      type: 'system',
+      target_audience: 'all'
+    };
+
+    const { data: existing } = await client
+      .from('announcements')
+      .select('id')
+      .eq('title', 'SYS_PAYMENT_CONFIG')
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await client
+        .from('announcements')
+        .update({ content: payload.content, updated_at: new Date().toISOString() })
+        .eq('id', existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await client
+        .from('announcements')
+        .insert([payload]);
+      if (error) throw error;
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception savePaymentConfig:", err);
+    return { success: false, error: err.message || "Gagal menyimpan config pembayaran." };
+  }
+}
+
 /** Mengambil data CCTV Monitor Per Sesi Ujian (Bypass RLS via Service Role & Cross-Match) */
 export async function getCbtMonitorData(examId: string) {
   try {
