@@ -199,37 +199,15 @@ export default function UserDashboard() {
         
         const userStatus = entry?.payment_status === 'Verified' ? 'Verified' : 'Pending';
 
-        const { data: announcementsData } = await supabase
-          .from('announcements')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        // Filter client-side: hapus pengumuman sistem, dan filter berdasarkan target
-        const filteredAnnouncements = (announcementsData || []).filter((item: any) => {
-          // Hapus data sistem internal
-          if (item.title === 'SYS_PORTAL_SETTINGS' || item.title === 'SYSTEM_TIMELINE_CONFIG') return false;
-          
-          // Jika target_audience kosong/null, tampilkan (broadcast LLMS lama)
-          if (!item.target_audience) return true;
-          
-          // Jika target semua orang
-          if (item.target_audience === 'All') return true;
-          
-          // Jika target berdasarkan status user (Verified/Pending)
-          if (item.target_audience === userStatus) return true;
-          
-          // Jika target spesifik, cek apakah user.id ada di content JSON
-          if (item.target_audience === 'specific') {
-            try {
-              const parsed = JSON.parse(item.content);
-              return Array.isArray(parsed.target_user_ids) && parsed.target_user_ids.includes(user.id);
-            } catch (e) {
-              return false;
-            }
-          }
-          return false;
-        });
-        setAnnouncements(filteredAnnouncements);
+        // Tarik pengumuman dengan server action bypass RLS (termasuk identifikasi entry ID & email)
+        const { getParticipantBroadcasts } = await import("@/app/actions/auth");
+        const { data: participantAnnouncements } = await getParticipantBroadcasts(
+          user.id, 
+          userStatus, 
+          entry?.id, 
+          user.email
+        );
+        setAnnouncements(participantAnnouncements || []);
         
         // 3. Tarik Konfigurasi Jadwal Global (Bypass Cache)
         // 3. Tarik Konfigurasi Jadwal Global (Bypass Cache Total)
@@ -322,32 +300,21 @@ export default function UserDashboard() {
           }
 
           // 3. JIKA ADA PENGUMUMAN BARU / DIHAPUS (REAL-TIME SYNC FOR USER BROADCASTS)
-          if (updated.title !== 'SYSTEM_TIMELINE_CONFIG' && updated.title !== 'SYS_PORTAL_SETTINGS') {
+          if (updated.title !== 'SYSTEM_TIMELINE_CONFIG' && updated.title !== 'SYS_PORTAL_SETTINGS' && updated.title !== 'SYS_TOKEN_SETTINGS') {
             const refetchAnnouncements = async () => {
               try {
-                const { data: latestData } = await supabase
-                  .from('announcements')
-                  .select('*')
-                  .order('created_at', { ascending: false });
-
                 const userStatus = userEntryRef.current?.payment_status === 'Verified' ? 'Verified' : 'Pending';
-                
-                const filtered = (latestData || []).filter((item: any) => {
-                  if (item.title === 'SYS_PORTAL_SETTINGS' || item.title === 'SYSTEM_TIMELINE_CONFIG') return false;
-                  if (!item.target_audience) return true;
-                  if (item.target_audience === 'All') return true;
-                  if (item.target_audience === userStatus) return true;
-                  if (item.target_audience === 'specific') {
-                    try {
-                      const parsed = JSON.parse(item.content);
-                      return Array.isArray(parsed.target_user_ids) && parsed.target_user_ids.includes(currentUserRef.current?.id);
-                    } catch (e) {
-                      return false;
-                    }
-                  }
-                  return false;
-                });
-                setAnnouncements(filtered);
+                const currentUserObj = currentUserRef.current;
+                if (!currentUserObj?.id) return;
+
+                const { getParticipantBroadcasts } = await import("@/app/actions/auth");
+                const { data: latestAnnouncements } = await getParticipantBroadcasts(
+                  currentUserObj.id, 
+                  userStatus, 
+                  userEntryRef.current?.id, 
+                  currentUserObj.email
+                );
+                setAnnouncements(latestAnnouncements || []);
               } catch (err) {
                 console.error("Gagal melakukan real-time sync pengumuman:", err);
               }

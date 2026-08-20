@@ -1333,12 +1333,10 @@ function ModernHQDashboardContent() {
       onConfirm: async () => {
         setConfirmModal(prev => ({ ...prev, show: false }));
         try {
-          const { error } = await supabase
-            .from('announcements')
-            .delete()
-            .eq('id', id);
+          const { deleteAdminBroadcast } = await import("@/app/actions/auth");
+          const { success, error } = await deleteAdminBroadcast(id);
 
-          if (error) throw error;
+          if (error || !success) throw new Error(error || "Gagal menghapus");
 
           showToast("Pengumuman berhasil dihapus!", "success");
           fetchBroadcasts();
@@ -2437,27 +2435,17 @@ function ModernHQDashboardContent() {
     setIsSending(false); // Kembalikan ke false agar tombol kirim bisa langsung digunakan
     showToast("Pesan sedang diproses dan diantarkan ke seluruh peserta di latar belakang...", "success");
 
-    // 3. Eksekusi pengiriman ke database Supabase di latar belakang (Non-Blocking)
+    // 3. Eksekusi pengiriman ke database via Server Action (Bypass RLS & Non-Blocking)
     try {
-      const contentPayload = JSON.stringify({
+      const { postAdminBroadcast } = await import("@/app/actions/auth");
+      const { data, error } = await postAdminBroadcast({
+        title: titleBackup,
         message: messageBackup,
+        target_audience: targetBackup,
         target_user_ids: targetBackup === 'specific' ? selectedBackup : []
       });
 
-      const { data, error } = await supabase
-        .from('announcements')
-        .insert([
-          {
-            title: titleBackup,
-            message: messageBackup,
-            content: contentPayload,
-            target_audience: targetBackup
-          }
-        ])
-        .select()
-        .single();
-
-      if (error) throw error;
+      if (error) throw new Error(error);
 
       // Ganti ID tiruan dengan data asli dari database
       if (data) {

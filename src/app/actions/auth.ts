@@ -765,6 +765,141 @@ export async function getAdminBroadcasts() {
   }
 }
 
+/** Mengirim siaran komando secara aman (Bypass RLS via Service Role) */
+export async function postAdminBroadcast(payload: {
+  title: string;
+  message: string;
+  target_audience: string;
+  target_user_ids?: string[];
+}) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const contentPayload = JSON.stringify({
+      message: payload.message,
+      target_user_ids: payload.target_audience === 'specific' ? (payload.target_user_ids || []) : []
+    });
+
+    const { data, error } = await client
+      .from('announcements')
+      .insert([
+        {
+          title: payload.title,
+          message: payload.message,
+          content: contentPayload,
+          target_audience: payload.target_audience
+        }
+      ])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception postAdminBroadcast:", err);
+    return { data: null, error: err.message || "Gagal menyiarkan pesan." };
+  }
+}
+
+/** Menghapus siaran komando secara aman (Bypass RLS via Service Role) */
+export async function deleteAdminBroadcast(id: string) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { error } = await client
+      .from('announcements')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception deleteAdminBroadcast:", err);
+    return { success: false, error: err.message || "Gagal menghapus siaran." };
+  }
+}
+
+/** Mengambil data pengumuman untuk peserta secara aman (RLS bypass) dan sesuai target */
+export async function getParticipantBroadcasts(
+  userId: string, 
+  userStatus: string = 'Pending',
+  entryId?: string,
+  userEmail?: string
+) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { data: rawData, error } = await client
+      .from('announcements')
+      .select('*')
+      .neq('title', 'SYS_PORTAL_SETTINGS')
+      .neq('title', 'SYSTEM_TIMELINE_CONFIG')
+      .neq('title', 'SYS_TOKEN_SETTINGS')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const validIds = new Set<string>();
+    if (userId) validIds.add(String(userId).trim());
+    if (entryId) validIds.add(String(entryId).trim());
+    if (userEmail) validIds.add(String(userEmail).toLowerCase().trim());
+
+    const filtered = (rawData || []).filter((item: any) => {
+      // 1. Jika target_audience kosong atau 'All', kirim ke semua
+      if (!item.target_audience || item.target_audience === 'All' || item.target_audience === 'all') return true;
+      
+      // 2. Jika target audiens cocok dengan status (Verified/Pending)
+      if (item.target_audience.toLowerCase() === userStatus.toLowerCase()) return true;
+      
+      // 3. Jika target audiens spesifik (manual)
+      if (item.target_audience === 'specific' || item.target_audience === 'Spesifik (Manual)') {
+        try {
+          const parsed = typeof item.content === 'string' ? JSON.parse(item.content) : item.content;
+          const targetList: any[] = parsed?.target_user_ids || [];
+          if (!Array.isArray(targetList) || targetList.length === 0) return true; // jika kosong berarti broadcast
+          
+          return targetList.some((targetId: any) => {
+            const strId = String(targetId).toLowerCase().trim();
+            return validIds.has(strId) || (userId && strId === userId.toLowerCase().trim()) || (entryId && strId === entryId.toLowerCase().trim());
+          });
+        } catch (e) {
+          return true;
+        }
+      }
+      return false;
+    });
+
+    return { data: filtered, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception getParticipantBroadcasts:", err);
+    return { data: [], error: err.message || "Gagal mengambil pengumuman." };
+  }
+}
+
 /** Mengambil percakapan sekolah secara aman dari server (RLS bypass) */
 export async function getSchoolMessages(schoolName: string, npsn?: string) {
   try {
