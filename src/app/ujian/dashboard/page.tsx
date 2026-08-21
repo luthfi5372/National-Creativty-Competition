@@ -104,21 +104,22 @@ export default function StudentDashboard() {
 
     const fetchAll = async () => {
       if (parsedUser.active_exam_id) {
-        const { data: exData, error: exError } = await supabase
-          .from('cbt_exams').select('duration, duration_minutes, is_active, correct_point, penalty_point, empty_point, scoring_system').eq('id', parsedUser.active_exam_id).single();
+        // Ambil data ujian & jumlah soal via Server Action (Bypass RLS)
+        const { getExamDataServer } = await import('@/app/actions/auth');
+        const { exam: exData, questions: qData, error: serverErr } = await getExamDataServer(parsedUser.active_exam_id);
+
+        if (serverErr) {
+          console.error("[Dashboard] Gagal ambil data ujian:", serverErr);
+        }
         
-        if (exError || !exData || !exData.is_active) {
+        if (!exData || !exData.is_active) {
           localStorage.removeItem('ncc_user');
           router.push('/ujian/login');
           return;
         }
 
-        if (exData) setExamDetail(exData);
-
-        const { count } = await supabase
-          .from('cbt_questions').select('*', { count: 'exact', head: true })
-          .eq('exam_id', parsedUser.active_exam_id);
-        setQuestionCount(count || 0);
+        setExamDetail(exData);
+        setQuestionCount(qData?.length || 0);
 
         const userId = parsedUser.ticket_code || (parsedUser.id ? `NCC-${generateTicketCode(parsedUser.id)}` : (parsedUser.nisn || parsedUser.username));
 
@@ -127,7 +128,7 @@ export default function StudentDashboard() {
 
         if (existingAttempt) {
           // 🔒 CEK BLOKIR: Jika sudah mencapai 3 pelanggaran dan belum submit
-          if ((existingAttempt.violations_count || 0) >= 3 && !existingAttempt.submitted_at) {
+          if ((existingAttempt.violations_count || 0) >= 3 && existingAttempt.status !== 'submitted') {
             setIsDone(false);
             setIsUserBlocked(true);
             localStorage.setItem(`cbt_blocked_${parsedUser.active_exam_id}`, 'true');
@@ -136,7 +137,7 @@ export default function StudentDashboard() {
             localStorage.removeItem(`cbt_blocked_${parsedUser.active_exam_id}`);
           }
 
-          if (existingAttempt.submitted_at) {
+          if (existingAttempt.status === 'submitted') {
             setIsDone(true);
             localStorage.setItem(`cbt_submitted_${parsedUser.active_exam_id}`, 'true');
           } else {
