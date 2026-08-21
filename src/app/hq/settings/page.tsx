@@ -48,6 +48,16 @@ export default function SettingsDashboard() {
   });
   const [isSavingPaymentConfig, setIsSavingPaymentConfig] = useState(false);
 
+  // States for Participant WhatsApp Group Links
+  const [groupLinks, setGroupLinks] = useState<Record<string, string>>({
+    general: "",
+    mipa: "",
+    lkti: "",
+    speech: "",
+    mtq: ""
+  });
+  const [isSavingGroupLinks, setIsSavingGroupLinks] = useState(false);
+
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -135,13 +145,19 @@ export default function SettingsDashboard() {
 
         // Ambil konfigurasi rekening & deskripsi pembayaran
         try {
-          const { getPaymentConfig } = await import('@/app/actions/auth');
-          const pRes = await getPaymentConfig();
+          const { getPaymentConfig, getGroupLinks } = await import('@/app/actions/auth');
+          const [pRes, gRes] = await Promise.all([
+            getPaymentConfig(),
+            getGroupLinks()
+          ]);
           if (pRes && pRes.data) {
             setPaymentConfig(pRes.data);
           }
+          if (gRes && gRes.data) {
+            setGroupLinks(gRes.data);
+          }
         } catch (pErr) {
-          console.error("Gagal memuat payment config:", pErr);
+          console.error("Gagal memuat payment/group config:", pErr);
         }
       } catch (err: any) {
         console.error("Gagal memuat pengaturan:", err);
@@ -920,11 +936,101 @@ export default function SettingsDashboard() {
                 </div>
               </div>
             </div>
+
+            {/* 💬 FITUR LINK GRUB PESERTA (WHATSAPP COMMUNITY) */}
+            <div className="pt-6 border-t border-slate-100">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h4 className="text-base font-black text-slate-800 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    Pengaturan Link Grup WhatsApp Peserta
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">Kelola link tautan undangan grup WhatsApp resmi untuk setiap cabang lomba peserta.</p>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-emerald-50/40 to-slate-50/70 p-6 rounded-2xl border border-emerald-100/60 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Grup Utama / Seluruh Peserta</label>
+                    <input 
+                      type="url" 
+                      value={groupLinks.general || ""} 
+                      onChange={(e) => setGroupLinks(prev => ({ ...prev, general: e.target.value }))}
+                      placeholder="https://chat.whatsapp.com/..." 
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Grup Cabang Olimpiade MIPA</label>
+                    <input 
+                      type="url" 
+                      value={groupLinks.mipa || ""} 
+                      onChange={(e) => setGroupLinks(prev => ({ ...prev, mipa: e.target.value }))}
+                      placeholder="https://chat.whatsapp.com/..." 
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Grup Cabang LKTI Nasional</label>
+                    <input 
+                      type="url" 
+                      value={groupLinks.lkti || ""} 
+                      onChange={(e) => setGroupLinks(prev => ({ ...prev, lkti: e.target.value }))}
+                      placeholder="https://chat.whatsapp.com/..." 
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Grup Cabang English Speech Contest</label>
+                    <input 
+                      type="url" 
+                      value={groupLinks.speech || ""} 
+                      onChange={(e) => setGroupLinks(prev => ({ ...prev, speech: e.target.value }))}
+                      placeholder="https://chat.whatsapp.com/..." 
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Grup Cabang MTQ (Musabaqah Tilawatil Qur'an)</label>
+                    <input 
+                      type="url" 
+                      value={groupLinks.mtq || ""} 
+                      onChange={(e) => setGroupLinks(prev => ({ ...prev, mtq: e.target.value }))}
+                      placeholder="https://chat.whatsapp.com/..." 
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={async () => {
+                      setIsSavingGroupLinks(true);
+                      try {
+                        const { saveGroupLinks } = await import('@/app/actions/auth');
+                        const res = await saveGroupLinks(groupLinks);
+                        if (res.error) throw new Error(res.error);
+                        setToastMessage("Tautan Grup WhatsApp berhasil disimpan & disinkronkan!");
+                        setTimeout(() => setToastMessage(""), 3000);
+                      } catch (err: any) {
+                        setToastMessage(`Gagal: ${err.message}`);
+                        setTimeout(() => setToastMessage(""), 3500);
+                      } finally {
+                        setIsSavingGroupLinks(false);
+                      }
+                    }}
+                    disabled={isSavingGroupLinks}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isSavingGroupLinks ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    Simpan Tautan Grup Peserta
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
-
-
-          {/* ── MANAJEMEN GELOMBANG PENDAFTARAN ─────────────────────────── */}
           <div className="bg-white rounded-[24px] p-8 shadow-sm border border-gray-100">
             <div className="flex items-start justify-between mb-6">
               <div>

@@ -148,62 +148,77 @@ export default function LiveLeaderboard() {
   };
 
   const fetchLeaderboardData = async () => {
-    const [attemptsRes, questionsRes, examRes, entriesRes] = await Promise.all([
-      supabase.from('cbt_attempts').select('*').eq('exam_id', examId),
-      supabase.from('cbt_questions').select('*').eq('exam_id', examId).order('created_at', { ascending: true }),
-      supabase.from('cbt_exams').select('*').eq('id', examId).maybeSingle(),
-      getAdminCompetitionEntries()
-    ]);
+    try {
+      const { getLeaderboardDataServer } = await import('@/app/actions/auth');
+      const { exam, questions, attempts: attemptsData, entries, error: sErr } = await getLeaderboardDataServer(examId);
 
-    if (attemptsRes.error) { console.error('Gagal:', attemptsRes.error); return; }
-    const qList = questionsRes.data || [];
-    setAllQuestions(qList);
-    if (examRes.data) setExamConfig(examRes.data);
+      if (sErr) {
+        console.error('Gagal mengambil data papan skor:', sErr);
+      }
 
-    if (entriesRes && entriesRes.data) {
-      const pMap: Record<string, any> = {};
-      entriesRes.data.forEach((entry: any) => {
-        let customTicketCode = "";
-        if (entry.notes) {
-          try {
-            const notesObj = JSON.parse(entry.notes);
-            if (notesObj.custom_ticket_id) {
-              customTicketCode = notesObj.custom_ticket_id.toUpperCase();
-            }
-          } catch (e) {}
-        }
-        
-        const generatedTicketCode = `NCC-${generateTicketCode(entry.id)}`.toUpperCase();
-        
-        const participantInfo = {
-          full_name: entry.full_name,
-          school_name: entry.school_name || entry.school || "",
-          email: entry.email,
-          nisn: entry.nisn,
-          province: entry.province,
-          city: entry.city,
-          category: entry.category,
-          competition_type: entry.competition_type,
-          team_name: entry.team_name,
-          mentor_name: entry.mentor_name,
-          whatsapp: entry.whatsapp_number || entry.phone || "",
-        };
+      const qList = questions || [];
+      setAllQuestions(qList);
+      if (exam) setExamConfig(exam);
 
-        // 1. Map by generated ticket code (e.g. NCC-9EU5JE)
-        pMap[generatedTicketCode] = participantInfo;
-        pMap[generatedTicketCode.replace("NCC-", "")] = participantInfo;
+      if (entries && entries.length > 0) {
+        const pMap: Record<string, any> = {};
+        entries.forEach((entry: any) => {
+          let customTicketCode = "";
+          if (entry.notes) {
+            try {
+              const notesObj = JSON.parse(entry.notes);
+              if (notesObj.custom_ticket_id) {
+                customTicketCode = notesObj.custom_ticket_id.toUpperCase();
+              }
+            } catch (e) {}
+          }
+          
+          const generatedTicketCode = `NCC-${generateTicketCode(entry.id)}`.toUpperCase();
+          
+          const participantInfo = {
+            full_name: entry.full_name,
+            school_name: entry.school_name || entry.school || "",
+            email: entry.email,
+            nisn: entry.nisn,
+            province: entry.province,
+            city: entry.city,
+            category: entry.category,
+            competition_type: entry.competition_type,
+            team_name: entry.team_name,
+            mentor_name: entry.mentor_name,
+            whatsapp: entry.whatsapp_number || entry.phone || "",
+          };
 
-        // 2. Map by custom ticket code if available (e.g. NCC-17772)
-        if (customTicketCode) {
-          pMap[customTicketCode] = participantInfo;
-          pMap[customTicketCode.replace("NCC-", "")] = participantInfo;
-        }
-      });
-      setParticipantMap(pMap);
+          // 1. Map by generated ticket code (e.g. NCC-9EU5JE)
+          pMap[generatedTicketCode] = participantInfo;
+          pMap[generatedTicketCode.replace("NCC-", "")] = participantInfo;
+
+          // 2. Map by custom ticket code if available (e.g. NCC-17772)
+          if (customTicketCode) {
+            pMap[customTicketCode] = participantInfo;
+            pMap[customTicketCode.replace("NCC-", "")] = participantInfo;
+          }
+
+          // 3. Map by user_id or email
+          if (entry.user_id) {
+            pMap[String(entry.user_id).toUpperCase()] = participantInfo;
+            pMap[String(entry.user_id).toLowerCase()] = participantInfo;
+          }
+          if (entry.nisn) {
+            pMap[String(entry.nisn)] = participantInfo;
+          }
+        });
+        setParticipantMap(pMap);
+      }
+
+      if (attemptsData) {
+        prosesDanUrutkanData(attemptsData, qList);
+      }
+    } catch (err: any) {
+      console.error("Gagal load leaderboard:", err);
+    } finally {
+      setLoading(false);
     }
-
-    if (attemptsRes.data) prosesDanUrutkanData(attemptsRes.data, qList);
-    setLoading(false);
   };
 
   const checkHasUngradedEssay = (item: any, customQuestions?: any[]) => {

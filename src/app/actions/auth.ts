@@ -1366,5 +1366,286 @@ export async function forceSubmitCbtParticipant(examId: string, userId: string) 
   }
 }
 
+/** Mengambil Link Grup WhatsApp Peserta (Bypass RLS) */
+export async function getGroupLinks() {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { data: record } = await client
+      .from('announcements')
+      .select('content')
+      .eq('title', 'SYS_COMMUNITY_GROUPS')
+      .maybeSingle();
+
+    if (record && record.content) {
+      try {
+        const parsed = JSON.parse(record.content);
+        return { data: parsed, error: null };
+      } catch (e) {}
+    }
+
+    return {
+      data: {
+        general: "https://chat.whatsapp.com/sample-general-ncc",
+        mipa: "https://chat.whatsapp.com/sample-mipa-ncc",
+        lkti: "https://chat.whatsapp.com/sample-lkti-ncc",
+        speech: "https://chat.whatsapp.com/sample-speech-ncc",
+        mtq: "https://chat.whatsapp.com/sample-mtq-ncc"
+      },
+      error: null
+    };
+  } catch (err: any) {
+    console.error("[Server Action] Exception getGroupLinks:", err);
+    return { data: null, error: err.message || "Gagal mengambil link grup." };
+  }
+}
+
+/** Menyimpan Link Grup WhatsApp Peserta (Bypass RLS) */
+export async function saveGroupLinks(links: Record<string, string>) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const payload = {
+      title: 'SYS_COMMUNITY_GROUPS',
+      message: 'SYS_COMMUNITY_GROUPS',
+      content: JSON.stringify({
+        ...links,
+        updatedAt: new Date().toISOString()
+      }),
+      type: 'system',
+      target_audience: 'all'
+    };
+
+    const { data: existing } = await client
+      .from('announcements')
+      .select('id')
+      .eq('title', 'SYS_COMMUNITY_GROUPS')
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await client
+        .from('announcements')
+        .update({ content: payload.content, updated_at: new Date().toISOString() })
+        .eq('id', existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await client
+        .from('announcements')
+        .insert([payload]);
+      if (error) throw error;
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception saveGroupLinks:", err);
+    return { success: false, error: err.message || "Gagal menyimpan link grup." };
+  }
+}
+
+/** Rekam Kehadiran/Mulai Ujian Peserta CBT (Bypass RLS) */
+export async function initCbtParticipantAttempt(examId: string, userId: string) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { data: existing } = await client
+      .from('cbt_attempts')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('exam_id', examId)
+      .maybeSingle();
+
+    if (existing) {
+      // Perbarui timestamp aktif
+      await client
+        .from('cbt_attempts')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', existing.id);
+      return { data: existing, error: null };
+    }
+
+    // Insert attempt baru
+    const { data: created, error } = await client
+      .from('cbt_attempts')
+      .insert([{
+        user_id: userId,
+        exam_id: examId,
+        violations_count: 0,
+        warnings_count: 0,
+        started_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { data: created, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception initCbtParticipantAttempt:", err);
+    return { data: null, error: err.message || "Gagal inisialisasi attempt." };
+  }
+}
+
+/** Catat Pelanggaran Proctoring CBT secara Instan (Bypass RLS) */
+export async function recordCbtViolation(examId: string, userId: string) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { data: attempt } = await client
+      .from('cbt_attempts')
+      .select('id, violations_count')
+      .eq('user_id', userId)
+      .eq('exam_id', examId)
+      .maybeSingle();
+
+    const currentCount = attempt?.violations_count || 0;
+    const newCount = currentCount + 1;
+
+    if (attempt) {
+      await client
+        .from('cbt_attempts')
+        .update({
+          violations_count: newCount,
+          warnings_count: newCount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', attempt.id);
+    } else {
+      await client
+        .from('cbt_attempts')
+        .insert([{
+          user_id: userId,
+          exam_id: examId,
+          violations_count: newCount,
+          warnings_count: newCount,
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }]);
+    }
+
+    return { success: true, count: newCount, isBlocked: newCount >= 3, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception recordCbtViolation:", err);
+    return { success: false, count: 0, isBlocked: false, error: err.message || "Gagal merekam pelanggaran." };
+  }
+}
+
+/** Submit Ujian CBT & Kalkulasi Nilai Akhir (Bypass RLS) */
+export async function submitCbtExamAnswers(examId: string, userId: string, answers: any, score: number) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { error } = await client
+      .from('cbt_attempts')
+      .update({
+        answers: answers,
+        score: score,
+        final_score: score,
+        status: 'submitted',
+        submitted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId)
+      .eq('exam_id', examId);
+
+    if (error) throw error;
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception submitCbtExamAnswers:", err);
+    return { success: false, error: err.message || "Gagal submit jawaban ujian." };
+  }
+}
+
+/** Mengambil Data Papan Skor / Leaderboard CBT dengan Evaluasi Soal (Bypass RLS) */
+export async function getLeaderboardDataServer(examId: string) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const [examRes, qRes, aRes, eRes] = await Promise.all([
+      client.from('cbt_exams').select('*').eq('id', examId).maybeSingle(),
+      client.from('cbt_questions').select('*').eq('exam_id', examId).order('created_at', { ascending: true }),
+      client.from('cbt_attempts').select('*').eq('exam_id', examId).order('updated_at', { ascending: false }),
+      client.from('competition_entries').select('id, user_id, full_name, school_name, school, category, competition_type, notes, email, nisn, phone, whatsapp_number, province, city, team_name, mentor_name')
+    ]);
+
+    let attempts = aRes.data || [];
+
+    // Fallback: Jika attempts kosong tapi ada data global
+    if (attempts.length === 0) {
+      const { data: allAttempts } = await client
+        .from('cbt_attempts')
+        .select('*')
+        .order('updated_at', { ascending: false });
+      if (allAttempts && allAttempts.length > 0) {
+        attempts = allAttempts;
+      }
+    }
+
+    return {
+      exam: examRes.data || null,
+      questions: qRes.data || [],
+      attempts: attempts,
+      entries: eRes.data || [],
+      error: null
+    };
+  } catch (err: any) {
+    console.error("[Server Action] Exception getLeaderboardDataServer:", err);
+    return {
+      exam: null,
+      questions: [],
+      attempts: [],
+      entries: [],
+      error: err.message || "Gagal mengambil data papan skor."
+    };
+  }
+}
+
 
 

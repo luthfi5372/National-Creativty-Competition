@@ -53,24 +53,39 @@ export default function StatusCards({
     description: "Untuk mengaktifkan kepesertaan Anda di cabang {category}, silakan lakukan transfer administrasi pendaftaran:"
   });
 
+  // 💬 DYNAMIC WHATSAPP GROUP LINKS
+  const [dynamicGroupLinks, setDynamicGroupLinks] = useState<Record<string, string>>({
+    general: "",
+    mipa: "",
+    lkti: "",
+    speech: "",
+    mtq: ""
+  });
+
   useEffect(() => {
-    const loadPaymentConfig = async () => {
+    const loadConfigs = async () => {
       try {
-        const { getPaymentConfig } = await import('@/app/actions/auth');
-        const res = await getPaymentConfig();
-        if (res && res.data) {
-          setDynamicPaymentConfig(res.data);
+        const { getPaymentConfig, getGroupLinks } = await import('@/app/actions/auth');
+        const [pRes, gRes] = await Promise.all([
+          getPaymentConfig(),
+          getGroupLinks()
+        ]);
+        if (pRes && pRes.data) {
+          setDynamicPaymentConfig(pRes.data);
+        }
+        if (gRes && gRes.data) {
+          setDynamicGroupLinks(gRes.data);
         }
       } catch (err) {
-        console.error("Gagal load payment config:", err);
+        console.error("Gagal load payment/group config:", err);
       }
     };
-    loadPaymentConfig();
+    loadConfigs();
 
-    const channel = supabase.channel('realtime-payment-config')
+    const channel = supabase.channel('realtime-dashboard-configs')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, (payload) => {
-        if (payload.new && (payload.new as any).title === 'SYS_PAYMENT_CONFIG') {
-          loadPaymentConfig();
+        if (payload.new && ['SYS_PAYMENT_CONFIG', 'SYS_COMMUNITY_GROUPS'].includes((payload.new as any).title)) {
+          loadConfigs();
         }
       })
       .subscribe();
@@ -1129,6 +1144,17 @@ export default function StatusCards({
           };
           const cpList = getWhatsAppCPs();
 
+          // Map kategori lomba ke Link Grup WhatsApp resmi
+          const getGroupUrl = () => {
+            const cat = (userEntry?.competition_type || userEntry?.category || '').toLowerCase();
+            if (cat.includes('lkti')) return dynamicGroupLinks.lkti || dynamicGroupLinks.general;
+            if (cat.includes('mipa') || cat.includes('olimpiade')) return dynamicGroupLinks.mipa || dynamicGroupLinks.general;
+            if (cat.includes('speech')) return dynamicGroupLinks.speech || dynamicGroupLinks.general;
+            if (cat.includes('mtq')) return dynamicGroupLinks.mtq || dynamicGroupLinks.general;
+            return dynamicGroupLinks.general;
+          };
+          const groupUrl = getGroupUrl();
+
           const makeWaUrl = (phone: string) =>
             `https://wa.me/${phone}?text=${encodeURIComponent(`Assalamualaikum, saya peserta ${juknisLabel} NCC 13th. Saya ingin bertanya mengenai informasi lomba.`)}`;
 
@@ -1140,6 +1166,13 @@ export default function StatusCards({
               color: "blue",
               href: juknisUrl || "#"
             },
+            ...(groupUrl ? [{
+              label: `Grup WhatsApp ${juknisLabel}`,
+              sub: "Komunitas resmi peserta NCC 13th",
+              icon: MessageCircle,
+              color: "emerald",
+              href: groupUrl
+            }] : []),
             { label: "Twibbon Resmi", sub: "Unduh aset kampanye IG", icon: ImageIcon, color: "purple", href: "#" },
             // Generate 1 atau lebih tombol CP sesuai jumlah CP di juknis
             ...(cpList.length > 0

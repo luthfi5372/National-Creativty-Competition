@@ -80,6 +80,7 @@ export default function StudentDashboard() {
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
 
   const [statusPassing, setStatusPassing] = useState<'PENDING' | 'PASSED' | 'FAILED'>('PENDING');
+  const [isUserBlocked, setIsUserBlocked] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const certificateRef = useRef<HTMLDivElement>(null);
@@ -121,13 +122,19 @@ export default function StudentDashboard() {
 
         const userId = parsedUser.ticket_code || (parsedUser.id ? `NCC-${generateTicketCode(parsedUser.id)}` : (parsedUser.nisn || parsedUser.username));
 
-        const { data: existingAttempt } = await supabase
-          .from('cbt_attempts').select('id, submitted_at, status_passing')
-          .eq('user_id', userId).eq('exam_id', parsedUser.active_exam_id).maybeSingle();
+        const { initCbtParticipantAttempt } = await import('@/app/actions/auth');
+        const { data: existingAttempt } = await initCbtParticipantAttempt(parsedUser.active_exam_id, userId);
 
         if (existingAttempt) {
-          await supabase.from('cbt_attempts')
-            .update({ updated_at: new Date().toISOString() }).eq('id', existingAttempt.id);
+          // 🔒 CEK BLOKIR: Jika sudah mencapai 3 pelanggaran dan belum submit
+          if ((existingAttempt.violations_count || 0) >= 3 && !existingAttempt.submitted_at) {
+            setIsDone(false);
+            setIsUserBlocked(true);
+            localStorage.setItem(`cbt_blocked_${parsedUser.active_exam_id}`, 'true');
+          } else {
+            setIsUserBlocked(false);
+            localStorage.removeItem(`cbt_blocked_${parsedUser.active_exam_id}`);
+          }
 
           if (existingAttempt.submitted_at) {
             setIsDone(true);
@@ -142,12 +149,9 @@ export default function StudentDashboard() {
           else if (sp === 'FAILED') setStatusPassing('FAILED');
           else setStatusPassing('PENDING');
         } else {
-          await supabase.from('cbt_attempts').insert({
-            user_id: userId, exam_id: parsedUser.active_exam_id,
-            violations_count: 0, score: 0, status_passing: 'PENDING',
-            started_at: new Date().toISOString(), updated_at: new Date().toISOString()
-          });
-          setIsDone(false); setStatusPassing('PENDING');
+          setIsDone(false); 
+          setIsUserBlocked(false);
+          setStatusPassing('PENDING');
           localStorage.removeItem(`cbt_submitted_${parsedUser.active_exam_id}`);
         }
       }
@@ -181,8 +185,35 @@ export default function StudentDashboard() {
         )
         .subscribe();
 
+      const userAttemptId = parsedUser.ticket_code || (parsedUser.id ? `NCC-${generateTicketCode(parsedUser.id)}` : (parsedUser.nisn || parsedUser.username));
+      const attemptChannel = supabase
+        .channel(`dashboard_attempt_sync_${userAttemptId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'cbt_attempts',
+            filter: `user_id=eq.${userAttemptId}`
+          },
+          (payload: any) => {
+            if (payload.new) {
+              if ((payload.new.violations_count || 0) < 3) {
+                setIsUserBlocked(false);
+                localStorage.removeItem(`cbt_blocked_${parsedUser.active_exam_id}`);
+                showToast("Akses ujian telah dibuka oleh Pengawas!", "success");
+              } else if ((payload.new.violations_count || 0) >= 3 && !payload.new.submitted_at) {
+                setIsUserBlocked(true);
+                localStorage.setItem(`cbt_blocked_${parsedUser.active_exam_id}`, 'true');
+              }
+            }
+          }
+        )
+        .subscribe();
+
       return () => {
         supabase.removeChannel(examChannel);
+        supabase.removeChannel(attemptChannel);
       };
     }
   }, [router]);
@@ -415,6 +446,15 @@ export default function StudentDashboard() {
               {isDone ? (
                 <div className="mt-6 py-4 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-2xl flex items-center justify-center font-black text-xs uppercase tracking-widest shadow-sm">
                   <ShieldCheckIcon className="w-5 h-5 mr-2" /> Ujian Telah Diselesaikan
+                </div>
+              ) : isUserBlocked ? (
+                <div className="mt-6 p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl text-center space-y-2">
+                  <div className="flex items-center justify-center gap-2 text-rose-600 font-black text-xs uppercase tracking-widest">
+                    <ShieldExclamationIcon className="w-5 h-5 animate-pulse" /> Sesi Ujian Diblokir Pengawas
+                  </div>
+                  <p className="text-[11px] font-semibold text-rose-500">
+                    Akses terkunci karena terdeteksi 3x pelanggaran. Silakan hubungi Panitia/Pengawas untuk membuka blokir via CCTV.
+                  </p>
                 </div>
               ) : (
                 <button onClick={handleStartExam} disabled={!isExamReady}

@@ -114,14 +114,10 @@ export default function ExamRoom() {
           }
         }
 
-        // 3. Lapor kehadiran CCTV
+        // 3. Lapor kehadiran CCTV & Inisialisasi Sesi (Bypass RLS)
         const userId = parsedUser.ticket_code || (parsedUser.id ? `NCC-${generateTicketCode(parsedUser.id)}` : (parsedUser.nisn || parsedUser.username));
-        const { data: existingUser, error: checkErr } = await supabase
-          .from('cbt_attempts')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('exam_id', examId)
-          .maybeSingle();
+        const { initCbtParticipantAttempt } = await import('@/app/actions/auth');
+        const { data: existingUser, error: checkErr } = await initCbtParticipantAttempt(examId, userId);
 
         if (existingUser) {
           // 🔥 PROTOKOL PENGUNCI KETAT: Cek status selesai pengerjaan di database
@@ -149,12 +145,9 @@ export default function ExamRoom() {
           }
 
           setViolationCount(existingUser.violations_count || 0);
-          if ((existingUser.violations_count || 0) >= 3) setIsBlocked(true);
-          await supabase.from('cbt_attempts').update({ updated_at: new Date().toISOString() }).eq('user_id', userId).eq('exam_id', examId);
-        } else {
-          await supabase.from('cbt_attempts').insert({ 
-            user_id: userId, exam_id: examId, violations_count: 0, started_at: new Date().toISOString(), updated_at: new Date().toISOString() 
-          });
+          if ((existingUser.violations_count || 0) >= 3) {
+            setIsBlocked(true);
+          }
         }
 
       } catch (err: any) {
@@ -264,23 +257,60 @@ export default function ExamRoom() {
     };
   }, [student, examId, isFinished, router, supabase]);
 
-  // 🔥 RADAR SENSITIVITAS TINGGI
+  // 📡 REALTIME SUBSCRIPTION FOR UNLOCK / PERMISSION RESTORATION
+  useEffect(() => {
+    if (!student || !examId) return;
+
+    const userId = student.ticket_code || (student.id ? `NCC-${generateTicketCode(student.id)}` : (student.nisn || student.username));
+
+    const channel = supabase
+      .channel(`cbt_attempts_unlock_${userId}_${examId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'cbt_attempts',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload: any) => {
+          if (payload.new && (payload.new.violations_count === 0 || payload.new.warnings_count === 0)) {
+            console.log("[CBT REALTIME] Akses ujian dibuka oleh pengawas!");
+            setViolationCount(0);
+            setIsBlocked(false);
+            setShowCheatWarning(false);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [student, examId, supabase]);
+
+  // 🔥 RADAR SENSITIVITAS TINGGI (ANTI-CHEAT)
   useEffect(() => {
     const handleCheat = async () => {
       // Jika tab tidak aktif / pindah aplikasi
-      if (!isFinished && !isBlocked && student) {
-        const newCount = violationCount + 1;
-        setViolationCount(newCount);
-        
+      if (!isFinished && !isBlocked && student && examId) {
         const cbtUserId = student.ticket_code || (student.id ? `NCC-${generateTicketCode(student.id)}` : (student.nisn || student.username));
 
-        await supabase.from('cbt_attempts').update({ 
-          violations_count: newCount,
-          updated_at: new Date().toISOString() 
-        }).eq('user_id', cbtUserId).eq('exam_id', examId);
-
-        if (newCount >= 3) setIsBlocked(true);
-        else setShowCheatWarning(true); 
+        try {
+          const { recordCbtViolation } = await import('@/app/actions/auth');
+          const res = await recordCbtViolation(examId, cbtUserId);
+          if (res && res.success) {
+            setViolationCount(res.count);
+            if (res.isBlocked) {
+              setIsBlocked(true);
+              setShowCheatWarning(false);
+            } else {
+              setShowCheatWarning(true);
+            }
+          }
+        } catch (err) {
+          console.error("Gagal merekam pelanggaran:", err);
+        }
       }
     };
 
@@ -294,7 +324,7 @@ export default function ExamRoom() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("blur", onWindowBlur);
     };
-  }, [violationCount, student, isFinished, isBlocked, examId]);
+  }, [student, isFinished, isBlocked, examId]);
 
   const handleSelectOption = async (questionId: string, option: string) => {
     const q = questions.find(item => item.id === questionId);
@@ -410,19 +440,13 @@ export default function ExamRoom() {
       }
       finalScore = Math.max(0, Math.round(finalScore * 100) / 100);
 
-      // 2. Kirim Data ke Pusat Komando
+      // 2. Kirim Data ke Pusat Komando (Bypass RLS via Server Action)
       const userId = student?.ticket_code || (student?.id ? `NCC-${generateTicketCode(student.id)}` : (student?.nisn || student?.username));
       if (userId && examId && examId !== 'undefined') {
-        const { error } = await supabase.from('cbt_attempts').update({
-          submitted_at: new Date().toISOString(),
-          status: 'submitted', // Set status secara eksplisit
-          score: finalScore,
-          final_score: finalScore,
-          answers: answers, // Kirim juga rekaman jawaban mentah
-          updated_at: new Date().toISOString()
-        }).eq('user_id', userId).eq('exam_id', examId);
+        const { submitCbtExamAnswers } = await import('@/app/actions/auth');
+        const { success, error } = await submitCbtExamAnswers(examId, userId, answers, finalScore);
         
-        if (error) throw error;
+        if (error || !success) throw new Error(error || "Gagal menyimpan jawaban.");
 
         // Simpan status submit secara lokal agar cepat terdeteksi tanpa kueri jaringan
         localStorage.setItem(`cbt_submitted_${examId}`, 'true');
