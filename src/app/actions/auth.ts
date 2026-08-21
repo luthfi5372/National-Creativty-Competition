@@ -1254,12 +1254,32 @@ export async function getCbtMonitorData(examId: string) {
       .eq('id', examId)
       .maybeSingle();
 
-    // 2. Ambil attempts untuk exam ini
+    // 2. Ambil attempts untuk exam ini (baik yang memakai id uuid, string id, atau session context)
     let { data: attempts, error: aError } = await client
       .from('cbt_attempts')
       .select('*')
       .eq('exam_id', examId)
       .order('updated_at', { ascending: false });
+
+    // Jika attempts kosong via query langsung (misal exam_id disimpan beda format), lakukan cross-check
+    if (!attempts || attempts.length === 0) {
+      const { data: allAttempts } = await client
+        .from('cbt_attempts')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (allAttempts && allAttempts.length > 0) {
+        // Cek apakah ada attempt yang exam_id-nya cocok atau bernilai falsy / token
+        const matched = allAttempts.filter((a: any) => 
+          !a.exam_id || 
+          String(a.exam_id).toLowerCase() === String(examId).toLowerCase() ||
+          (examData?.token && String(a.exam_id).toLowerCase() === String(examData.token).toLowerCase())
+        );
+        if (matched.length > 0) {
+          attempts = matched;
+        }
+      }
+    }
 
     // 3. Ambil data profil & competition_entries untuk enrich nama & sekolah
     const { data: entriesData } = await client

@@ -167,14 +167,23 @@ export default function LiveMonitor() {
 
     fetchData();
 
+    // 📡 1. Realtime postgres_changes listener
     const channel = supabase.channel(`live-cctv-${examId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cbt_attempts' }, () => {
         fetchData();
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  }, [examId, fetchData]);
+    // ⚡ 2. Polling Heartbeat (setiap 3 detik) sebagai jaminan fallback jika websocket sedang idle/reconnecting
+    const pollingInterval = setInterval(() => {
+      fetchData();
+    }, 3000);
+
+    return () => { 
+      supabase.removeChannel(channel); 
+      clearInterval(pollingInterval);
+    };
+  }, [examId, fetchData, supabase]);
 
   // Modal & Toast state
   const [unlockUserId, setUnlockUserId] = useState<string | null>(null);
