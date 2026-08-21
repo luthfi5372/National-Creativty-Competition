@@ -1261,27 +1261,6 @@ export async function getCbtMonitorData(examId: string) {
       .eq('exam_id', examId)
       .order('updated_at', { ascending: false });
 
-    // Fallback: Jika tidak ada attempts dengan exam_id spesifik, tapi ada data attempts global (misal id format beda)
-    if ((!attempts || attempts.length === 0)) {
-      const { data: allAttempts } = await client
-        .from('cbt_attempts')
-        .select('*')
-        .order('updated_at', { ascending: false });
-      
-      if (allAttempts && allAttempts.length > 0) {
-        // Cek apakah ada attempts yang cocok dengan exam_id atau judul
-        const matched = allAttempts.filter((a: any) => 
-          String(a.exam_id).toLowerCase() === String(examId).toLowerCase() || !a.exam_id
-        );
-        if (matched.length > 0) {
-          attempts = matched;
-        } else {
-          // Tampilkan semua attempts jika hanya ada 1 sesi aktif atau sesi simulasi
-          attempts = allAttempts;
-        }
-      }
-    }
-
     // 3. Ambil data profil & competition_entries untuk enrich nama & sekolah
     const { data: entriesData } = await client
       .from('competition_entries')
@@ -1646,17 +1625,6 @@ export async function getLeaderboardDataServer(examId: string) {
     ]);
 
     let attempts = aRes.data || [];
-
-    // Fallback: Jika attempts kosong tapi ada data global
-    if (attempts.length === 0) {
-      const { data: allAttempts } = await client
-        .from('cbt_attempts')
-        .select('*')
-        .order('updated_at', { ascending: false });
-      if (allAttempts && allAttempts.length > 0) {
-        attempts = allAttempts;
-      }
-    }
 
     return {
       exam: examRes.data || null,
