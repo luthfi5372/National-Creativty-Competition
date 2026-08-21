@@ -203,7 +203,7 @@ export default function StudentDashboard() {
                 setIsUserBlocked(false);
                 localStorage.removeItem(`cbt_blocked_${parsedUser.active_exam_id}`);
                 showToast("Akses ujian telah dibuka oleh Pengawas!", "success");
-              } else if ((payload.new.violations_count || 0) >= 3 && !payload.new.submitted_at) {
+              } else if ((payload.new.violations_count || 0) >= 3 && payload.new.status !== 'submitted') {
                 setIsUserBlocked(true);
                 localStorage.setItem(`cbt_blocked_${parsedUser.active_exam_id}`, 'true');
               }

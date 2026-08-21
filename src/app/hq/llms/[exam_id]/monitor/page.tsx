@@ -34,6 +34,7 @@ interface Participant {
   id: string;
   user_id: string;
   exam_id: string;
+  status?: string | null;
   submitted_at?: string | null;
   started_at?: string;
   updated_at: string;
@@ -69,8 +70,9 @@ export default function LiveMonitor() {
   const recalcStats = useCallback((list: Participant[]) => {
     let w = 0, s = 0, c = 0;
     list.forEach(p => {
-      if (p.submitted_at) s++; else w++;
-      if (p.violations_count >= 3) c++;
+      const done = p.status === 'submitted';
+      if (done) s++; else w++;
+      if ((p.violations_count >= 3) && !done) c++;
     });
     setStats({ working: w, submitted: s, cheating: c });
   }, []);
@@ -233,11 +235,11 @@ export default function LiveMonitor() {
   // Export CSV
   const exportCSV = () => {
     const rows = [
-      ['ID Peserta', 'Nama', 'Sekolah', 'Cabang', 'Status', 'Pelanggaran', 'Jam Mulai', 'Jam Submit'],
+      ['ID Peserta', 'Nama', 'Sekolah', 'Cabang', 'Status', 'Pelanggaran', 'Jam Update'],
       ...participants.map(p => {
         const info = p.user_id ? (participantMap[p.user_id.toUpperCase()] || participantMap[p.user_id.replace("NCC-", "").toUpperCase()] || { full_name: "", school_origin: "", branch: "" }) : { full_name: "", school_origin: "", branch: "" };
-        const isBlocked = p.violations_count >= 3 && !p.submitted_at;
-        const isDone = !!p.submitted_at;
+        const isDone = p.status === 'submitted';
+        const isBlocked = (p.violations_count >= 3) && !isDone;
         return [
           p.user_id,
           info.full_name || '-',
@@ -245,8 +247,7 @@ export default function LiveMonitor() {
           info.branch || '-',
           isDone ? 'Selesai' : isBlocked ? 'Diblokir' : 'Aktif',
           p.violations_count,
-          p.started_at ? new Date(p.started_at).toLocaleTimeString('id') : '-',
-          p.submitted_at ? new Date(p.submitted_at).toLocaleTimeString('id') : '-',
+          p.updated_at ? new Date(p.updated_at).toLocaleTimeString('id') : '-',
         ];
       })
     ];
@@ -282,9 +283,9 @@ export default function LiveMonitor() {
   ];
 
   const classify = (p: Participant) => {
-    const isBlocked = p.violations_count >= 3 && !p.submitted_at;
-    const isDone = !!p.submitted_at;
-    return { isBlocked, isDone, isActive: !isDone && !isBlocked, isWarning: p.violations_count > 0 && p.violations_count < 3 && !p.submitted_at };
+    const isDone = p.status === 'submitted';
+    const isBlocked = (p.violations_count >= 3) && !isDone;
+    return { isBlocked, isDone, isActive: !isDone && !isBlocked, isWarning: p.violations_count > 0 && p.violations_count < 3 && !isDone };
   };
 
   const filtered = useMemo(() => {
@@ -531,9 +532,9 @@ export default function LiveMonitor() {
                       )}
 
                       {/* Waktu submit */}
-                      {isDone && p.submitted_at && (
+                      {isDone && (
                         <p className="text-center text-[8px] text-emerald-600 font-bold">
-                          ✓ {new Date(p.submitted_at).toLocaleTimeString('id', { hour: '2-digit', minute: '2-digit' })}
+                          ✓ Selesai {p.updated_at ? new Date(p.updated_at).toLocaleTimeString('id', { hour: '2-digit', minute: '2-digit' }) : ''}
                         </p>
                       )}
                     </div>
