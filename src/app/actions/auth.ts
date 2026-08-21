@@ -1603,20 +1603,52 @@ export async function submitCbtExamAnswers(examId: string, userId: string, answe
         })
       : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
 
-    const { error } = await client
-      .from('cbt_attempts')
-      .update({
-        answers: answers,
-        score: score,
-        final_score: score,
-        status: 'submitted',
-        submitted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-      .eq('exam_id', examId);
+    const nowIso = new Date().toISOString();
+    const updatePayload = {
+      answers: answers,
+      score: score,
+      final_score: score,
+      status: 'submitted',
+      submitted_at: nowIso,
+      updated_at: nowIso
+    };
 
-    if (error) throw error;
+    // 1. Coba update record yang cocok dengan user_id & exam_id
+    const { data: updated, error: updateErr } = await client
+      .from('cbt_attempts')
+      .update(updatePayload)
+      .eq('user_id', userId)
+      .eq('exam_id', examId)
+      .select('id');
+
+    // 2. Jika belum ada attempt (atau user_id format beda), coba match user_id saja
+    if (!updated || updated.length === 0) {
+      const { data: updatedByUser } = await client
+        .from('cbt_attempts')
+        .update({
+          ...updatePayload,
+          exam_id: examId
+        })
+        .eq('user_id', userId)
+        .select('id');
+
+      if (!updatedByUser || updatedByUser.length === 0) {
+        // 3. Jika belum ada record sama sekali, insert baru
+        const { error: insertErr } = await client
+          .from('cbt_attempts')
+          .insert([{
+            user_id: userId,
+            exam_id: examId,
+            violations_count: 0,
+            warnings_count: 0,
+            started_at: nowIso,
+            ...updatePayload
+          }]);
+
+        if (insertErr) throw insertErr;
+      }
+    }
+
     return { success: true, error: null };
   } catch (err: any) {
     console.error("[Server Action] Exception submitCbtExamAnswers:", err);
@@ -1645,6 +1677,25 @@ export async function getLeaderboardDataServer(examId: string) {
     ]);
 
     let attempts = aRes.data || [];
+
+    // Jika attempts kosong, cek apakah ada attempt dengan token atau format id berbeda
+    if (!attempts || attempts.length === 0) {
+      const { data: allAttempts } = await client
+        .from('cbt_attempts')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (allAttempts && allAttempts.length > 0) {
+        const matched = allAttempts.filter((a: any) => 
+          !a.exam_id || 
+          String(a.exam_id).toLowerCase() === String(examId).toLowerCase() ||
+          (examRes.data?.token && String(a.exam_id).toLowerCase() === String(examRes.data.token).toLowerCase())
+        );
+        if (matched.length > 0) {
+          attempts = matched;
+        }
+      }
+    }
 
     return {
       exam: examRes.data || null,
