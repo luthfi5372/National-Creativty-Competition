@@ -46,7 +46,7 @@ export async function GET() {
       // Query cbt_attempts - ambil semua data (max 50)
       const { data: attemptsData, count: attemptsCount, error: attemptsErr } = await serviceClient
         .from('cbt_attempts')
-        .select('id, user_id, exam_id, status, violations_count, score, started_at, submitted_at, updated_at', { count: 'exact' })
+        .select('id, user_id, exam_id, status, violations_count, score, updated_at', { count: 'exact' })
         .order('updated_at', { ascending: false })
         .limit(50);
 

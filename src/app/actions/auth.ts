@@ -1531,7 +1531,6 @@ export async function initCbtParticipantAttempt(examId: string, userId: string) 
         exam_id: examId,
         violations_count: 0,
         warnings_count: 0,
-        started_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }])
       .select()
@@ -1585,7 +1584,6 @@ export async function recordCbtViolation(examId: string, userId: string) {
           exam_id: examId,
           violations_count: newCount,
           warnings_count: newCount,
-          started_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }]);
     }
@@ -1646,7 +1644,6 @@ export async function submitCbtExamAnswers(examId: string, userId: string, answe
       score: score,
       final_score: score,
       status: 'submitted',
-      submitted_at: nowIso,
       updated_at: nowIso
     };
 
@@ -1678,7 +1675,6 @@ export async function submitCbtExamAnswers(examId: string, userId: string, answe
             exam_id: examId,
             violations_count: 0,
             warnings_count: 0,
-            started_at: nowIso,
             ...updatePayload
           }]);
 
