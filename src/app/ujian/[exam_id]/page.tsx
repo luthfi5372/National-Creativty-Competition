@@ -67,57 +67,57 @@ export default function ExamRoom() {
 
     const loadExamData = async () => {
       try {
-        // 1. Ambil durasi, status aktif, dan konfigurasi penilaian
-        const { data: examData } = await supabase
-          .from('cbt_exams')
-          .select('duration, duration_minutes, is_active, correct_point, penalty_point, empty_point, scoring_system, shuffle_questions')
-          .eq('id', examId).maybeSingle();
+        // 1. Ambil data ujian & soal via Server Action (Bypass RLS)
+        const { getExamDataServer } = await import('@/app/actions/auth');
+        const { exam: examData, questions: qData, error: serverErr } = await getExamDataServer(examId);
+
+        if (serverErr) {
+          console.error("[SERVER ACTION] Gagal ambil data ujian:", serverErr);
+        }
         
         if (!examData || !examData.is_active) {
+          console.warn("[CBT] Ujian tidak aktif atau tidak ditemukan. Redirect ke login.");
           localStorage.removeItem('ncc_user');
           router.replace('/ujian/login');
           return;
         }
 
-        if (examData) {
-          const duration = examData.duration_minutes || examData.duration;
-          if (duration) {
-            setTimeLeft(duration * 60);
-            setOriginalDurationSec(duration * 60);
-          }
-          // Simpan konfigurasi penilaian ke state
-          setExamConfig({
-            correct_point: examData.correct_point ?? 4,
-            penalty_point: examData.penalty_point ?? 0,
-            empty_point: examData.empty_point ?? 0,
-            scoring_system: examData.scoring_system || 'Fixed',
-          });
+        const duration = examData.duration_minutes || examData.duration;
+        if (duration) {
+          setTimeLeft(duration * 60);
+          setOriginalDurationSec(duration * 60);
         }
+        setExamConfig({
+          correct_point: examData.correct_point ?? 4,
+          penalty_point: examData.penalty_point ?? 0,
+          empty_point: examData.empty_point ?? 0,
+          scoring_system: examData.scoring_system || 'Fixed',
+        });
 
-        // 2. Ambil soal
-        const { data: qData, error: qErr } = await supabase
-          .from('cbt_questions')
-          .select('*')
-          .eq('exam_id', examId)
-          .order('created_at', { ascending: true });
-
-        if (qErr) {
-          console.error("DATABASE ERROR SOAL:", qErr.message); 
-        } else if (qData && qData.length > 0) {
-          // shuffle_questions default true jika null/undefined (backward compat)
+        // 2. Set soal (sudah diambil bersamaan di Server Action)
+        if (qData && qData.length > 0) {
           const shouldShuffle = examData?.shuffle_questions !== false;
           if (shouldShuffle) {
             const shuffled = [...qData].sort(() => Math.random() - 0.5);
             setQuestions(shuffled);
           } else {
-            setQuestions(qData); // urutan tetap sesuai created_at
+            setQuestions(qData);
           }
         }
 
         // 3. Lapor kehadiran CCTV & Inisialisasi Sesi (Bypass RLS)
         const userId = parsedUser.ticket_code || (parsedUser.id ? `NCC-${generateTicketCode(parsedUser.id)}` : (parsedUser.nisn || parsedUser.username));
+        
+        console.log(`[CBT INIT] userId=${userId} | examId=${examId}`);
+        
         const { initCbtParticipantAttempt } = await import('@/app/actions/auth');
         const { data: existingUser, error: checkErr } = await initCbtParticipantAttempt(examId, userId);
+        
+        if (checkErr) {
+          console.error("[CBT INIT] Gagal init attempt:", checkErr);
+        } else {
+          console.log("[CBT INIT] Attempt berhasil terdaftar di CCTV:", existingUser?.id);
+        }
 
         if (existingUser) {
           // 🔥 PROTOKOL PENGUNCI KETAT: Cek status selesai pengerjaan di database

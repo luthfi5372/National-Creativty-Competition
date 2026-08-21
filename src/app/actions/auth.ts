@@ -1457,6 +1457,43 @@ export async function saveGroupLinks(links: Record<string, string>) {
   }
 }
 
+/** Ambil Data Ujian & Soal via Service Role (Bypass RLS untuk peserta non-auth) */
+export async function getExamDataServer(examId: string) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const [examRes, qRes] = await Promise.all([
+      client
+        .from('cbt_exams')
+        .select('id, title, token, duration, duration_minutes, is_active, correct_point, penalty_point, empty_point, scoring_system, shuffle_questions')
+        .eq('id', examId)
+        .maybeSingle(),
+      client
+        .from('cbt_questions')
+        .select('*')
+        .eq('exam_id', examId)
+        .order('created_at', { ascending: true })
+    ]);
+
+    return {
+      exam: examRes.data || null,
+      questions: qRes.data || [],
+      error: examRes.error?.message || qRes.error?.message || null
+    };
+  } catch (err: any) {
+    console.error("[Server Action] Exception getExamDataServer:", err);
+    return { exam: null, questions: [], error: err.message || "Gagal mengambil data ujian." };
+  }
+}
+
 /** Rekam Kehadiran/Mulai Ujian Peserta CBT (Bypass RLS) */
 export async function initCbtParticipantAttempt(examId: string, userId: string) {
   try {
