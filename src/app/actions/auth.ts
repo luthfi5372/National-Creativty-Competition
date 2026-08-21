@@ -1561,6 +1561,36 @@ export async function recordCbtViolation(examId: string, userId: string) {
   }
 }
 
+/** Menyimpan Jawaban Sementara / Draft Ujian CBT (Bypass RLS) */
+export async function saveCbtDraftAnswers(examId: string, userId: string, answers: any) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { error } = await client
+      .from('cbt_attempts')
+      .update({
+        answers: answers,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId)
+      .eq('exam_id', examId);
+
+    if (error) throw error;
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception saveCbtDraftAnswers:", err);
+    return { success: false, error: err.message || "Gagal menyimpan draft jawaban." };
+  }
+}
+
 /** Submit Ujian CBT & Kalkulasi Nilai Akhir (Bypass RLS) */
 export async function submitCbtExamAnswers(examId: string, userId: string, answers: any, score: number) {
   try {

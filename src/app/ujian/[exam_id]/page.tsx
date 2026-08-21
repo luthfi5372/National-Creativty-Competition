@@ -351,12 +351,14 @@ export default function ExamRoom() {
     if (doubtfulAnswers[questionId]) setDoubtfulAnswers(prev => ({ ...prev, [questionId]: false }));
     const userId = student?.ticket_code || (student?.id ? `NCC-${generateTicketCode(student.id)}` : (student?.nisn || student?.username));
     
-    // Keamanan ekstra saat mengirim jawaban
+    // Keamanan ekstra saat mengirim jawaban (Bypass RLS)
     if (userId && examId && examId !== 'undefined') {
-      await supabase.from('cbt_attempts').update({ 
-        answers: newAnswers,
-        updated_at: new Date().toISOString() 
-      }).eq('user_id', userId).eq('exam_id', examId);
+      try {
+        const { saveCbtDraftAnswers } = await import('@/app/actions/auth');
+        await saveCbtDraftAnswers(examId, userId, newAnswers);
+      } catch (e) {
+        console.error("Gagal simpan jawaban realtime:", e);
+      }
     }
   };
 
@@ -652,10 +654,10 @@ export default function ExamRoom() {
                               const val = answers[currentQ.id] || '';
                               const userId = student?.ticket_code || (student?.id ? `NCC-${generateTicketCode(student.id)}` : (student?.nisn || student?.username));
                               if (userId && examId && examId !== 'undefined') {
-                                await supabase.from('cbt_attempts').update({ 
-                                  answers: { ...answers, [currentQ.id]: val },
-                                  updated_at: new Date().toISOString() 
-                                }).eq('user_id', userId).eq('exam_id', examId);
+                                try {
+                                  const { saveCbtDraftAnswers } = await import('@/app/actions/auth');
+                                  await saveCbtDraftAnswers(examId, userId, { ...answers, [currentQ.id]: val });
+                                } catch (e) {}
                               }
                             }}
                             placeholder="Ketik jawaban Anda di sini..."
@@ -678,10 +680,10 @@ export default function ExamRoom() {
                               const val = answers[currentQ.id] || '';
                               const userId = student?.ticket_code || (student?.id ? `NCC-${generateTicketCode(student.id)}` : (student?.nisn || student?.username));
                               if (userId && examId && examId !== 'undefined') {
-                                await supabase.from('cbt_attempts').update({ 
-                                  answers: { ...answers, [currentQ.id]: val },
-                                  updated_at: new Date().toISOString() 
-                                }).eq('user_id', userId).eq('exam_id', examId);
+                                try {
+                                  const { saveCbtDraftAnswers } = await import('@/app/actions/auth');
+                                  await saveCbtDraftAnswers(examId, userId, { ...answers, [currentQ.id]: val });
+                                } catch (e) {}
                               }
                             }}
                             placeholder="Tulis jawaban essay Anda secara lengkap di sini..."
