@@ -43,10 +43,32 @@ export async function GET() {
         .from('cbt_questions')
         .select('*', { count: 'exact', head: true });
 
-      // Query cbt_attempts count
-      const { count: attemptsCount, error: attemptsErr } = await serviceClient
+      // Query cbt_attempts - ambil semua data (max 50)
+      const { data: attemptsData, count: attemptsCount, error: attemptsErr } = await serviceClient
         .from('cbt_attempts')
-        .select('*', { count: 'exact', head: true });
+        .select('id, user_id, exam_id, status, violations_count, score, started_at, submitted_at, updated_at', { count: 'exact' })
+        .order('updated_at', { ascending: false })
+        .limit(50);
+
+      // Test live: insert attempt percobaan dan hapus lagi
+      let insertTest: any = null;
+      try {
+        const testUserId = `DIAG-TEST-${Date.now()}`;
+        const testExamId = exams?.[0]?.id || 'no-exam-found';
+        const { data: insertData, error: insertErr } = await serviceClient
+          .from('cbt_attempts')
+          .insert({ user_id: testUserId, exam_id: testExamId, status: 'active', violations_count: 0 })
+          .select()
+          .single();
+        if (insertErr) {
+          insertTest = { success: false, error: insertErr.message };
+        } else {
+          await serviceClient.from('cbt_attempts').delete().eq('user_id', testUserId);
+          insertTest = { success: true, inserted_id: insertData?.id };
+        }
+      } catch (ie: any) {
+        insertTest = { success: false, exception: ie.message };
+      }
 
       diagnostics.stages.serviceRole = {
         success: !error,
@@ -59,7 +81,9 @@ export async function GET() {
           questionsCount: questionsCount || 0,
           questionsError: questionsErr ? { message: questionsErr.message, code: questionsErr.code } : null,
           attemptsCount: attemptsCount || 0,
-          attemptsError: attemptsErr ? { message: attemptsErr.message, code: attemptsErr.code } : null
+          attemptsError: attemptsErr ? { message: attemptsErr.message, code: attemptsErr.code } : null,
+          attemptsData: attemptsData || [],
+          insertTest
         }
       };
     } catch (err: any) {
