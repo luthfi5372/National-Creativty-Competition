@@ -1173,7 +1173,7 @@ export default function StatusCards({
               color: "emerald",
               href: groupUrl
             }] : []),
-            { label: "Twibbon Resmi", sub: "Unduh aset kampanye IG", icon: ImageIcon, color: "purple", href: "#" },
+            { label: "Twibbon Resmi", sub: "Pasang twibbon NCC 13th sekarang!", icon: ImageIcon, color: "purple", href: "https://twb.nz/nationalcreativitycompetition" },
             // Generate 1 atau lebih tombol CP sesuai jumlah CP di juknis
             ...(cpList.length > 0
               ? cpList.map((cp, idx) => ({
