@@ -48,14 +48,16 @@ export default function SettingsDashboard() {
   });
   const [isSavingPaymentConfig, setIsSavingPaymentConfig] = useState(false);
 
-  // States for Participant WhatsApp Group Links
-  const [groupLinks, setGroupLinks] = useState<Record<string, string>>({
-    general: "",
-    mipa: "",
-    lkti: "",
-    speech: "",
-    mtq: ""
-  });
+  // States for Participant WhatsApp Group Links — DYNAMIC LIST
+  interface GroupLinkItem { id: string; label: string; url: string; }
+  const [groupItems, setGroupItems] = useState<GroupLinkItem[]>([
+    { id: 'general', label: 'Grup Utama / Seluruh Peserta', url: '' },
+    { id: 'mipa', label: 'Grup Cabang Olimpiade MIPA', url: '' },
+    { id: 'lkti', label: 'Grup Cabang LKTI Nasional', url: '' },
+    { id: 'speech', label: 'Grup Cabang English Speech Contest', url: '' },
+    { id: 'mtq', label: "Grup Cabang MTQ (Musabaqah Tilawatil Qur'an)", url: '' },
+  ]);
+  const [groupLinks, setGroupLinks] = useState<Record<string, string>>({});
   const [isSavingGroupLinks, setIsSavingGroupLinks] = useState(false);
 
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -154,7 +156,18 @@ export default function SettingsDashboard() {
             setPaymentConfig(pRes.data);
           }
           if (gRes && gRes.data) {
-            setGroupLinks(gRes.data);
+            const saved = gRes.data;
+            // Filter out metadata keys like 'updatedAt'
+            const validKeys = Object.keys(saved).filter(k => k !== 'updatedAt' && typeof saved[k] === 'string');
+            if (validKeys.length > 0) {
+              // Build groupItems from saved data — preserve order, use key as id
+              const loadedItems = validKeys.map(k => ({
+                id: k,
+                label: saved[`${k}_label`] || keyToLabel(k),
+                url: saved[k] || ''
+              }));
+              setGroupItems(loadedItems);
+            }
           }
         } catch (pErr) {
           console.error("Gagal memuat payment/group config:", pErr);
@@ -168,6 +181,18 @@ export default function SettingsDashboard() {
     };
     fetchSettings();
   }, []);
+
+  // Helper: convert key to readable label
+  const keyToLabel = (key: string) => {
+    const map: Record<string, string> = {
+      general: 'Grup Utama / Seluruh Peserta',
+      mipa: 'Grup Cabang Olimpiade MIPA',
+      lkti: 'Grup Cabang LKTI Nasional',
+      speech: 'Grup Cabang English Speech Contest',
+      mtq: "Grup Cabang MTQ (Musabaqah Tilawatil Qur'an)",
+    };
+    return map[key] || key.charAt(0).toUpperCase() + key.slice(1);
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -945,71 +970,76 @@ export default function SettingsDashboard() {
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                     Pengaturan Link Grup WhatsApp Peserta
                   </h4>
-                  <p className="text-xs text-slate-500 mt-0.5">Kelola link tautan undangan grup WhatsApp resmi untuk setiap cabang lomba peserta.</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Kelola link tautan undangan grup WhatsApp. Tambah atau hapus grup sesuai kebutuhan.</p>
                 </div>
+                <button
+                  onClick={() => {
+                    const newId = `group_${Date.now()}`;
+                    setGroupItems(prev => [...prev, { id: newId, label: '', url: '' }]);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all shadow-sm"
+                >
+                  <Plus size={13} />
+                  Tambah Grup
+                </button>
               </div>
 
-              <div className="bg-gradient-to-br from-emerald-50/40 to-slate-50/70 p-6 rounded-2xl border border-emerald-100/60 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Grup Utama / Seluruh Peserta</label>
-                    <input 
-                      type="url" 
-                      value={groupLinks.general || ""} 
-                      onChange={(e) => setGroupLinks(prev => ({ ...prev, general: e.target.value }))}
-                      placeholder="https://chat.whatsapp.com/..." 
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    />
+              <div className="bg-gradient-to-br from-emerald-50/40 to-slate-50/70 p-6 rounded-2xl border border-emerald-100/60 space-y-3">
+                {groupItems.length === 0 && (
+                  <div className="text-center py-8 text-slate-400 text-xs font-semibold">
+                    Belum ada grup. Klik &quot;Tambah Grup&quot; untuk menambahkan.
                   </div>
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Grup Cabang Olimpiade MIPA</label>
-                    <input 
-                      type="url" 
-                      value={groupLinks.mipa || ""} 
-                      onChange={(e) => setGroupLinks(prev => ({ ...prev, mipa: e.target.value }))}
-                      placeholder="https://chat.whatsapp.com/..." 
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Grup Cabang LKTI Nasional</label>
-                    <input 
-                      type="url" 
-                      value={groupLinks.lkti || ""} 
-                      onChange={(e) => setGroupLinks(prev => ({ ...prev, lkti: e.target.value }))}
-                      placeholder="https://chat.whatsapp.com/..." 
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Grup Cabang English Speech Contest</label>
-                    <input 
-                      type="url" 
-                      value={groupLinks.speech || ""} 
-                      onChange={(e) => setGroupLinks(prev => ({ ...prev, speech: e.target.value }))}
-                      placeholder="https://chat.whatsapp.com/..." 
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">Grup Cabang MTQ (Musabaqah Tilawatil Qur'an)</label>
-                    <input 
-                      type="url" 
-                      value={groupLinks.mtq || ""} 
-                      onChange={(e) => setGroupLinks(prev => ({ ...prev, mtq: e.target.value }))}
-                      placeholder="https://chat.whatsapp.com/..." 
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    />
-                  </div>
-                </div>
+                )}
 
-                <div className="flex justify-end pt-1">
+                {groupItems.map((item, idx) => (
+                  <div key={item.id} className="flex items-start gap-3 bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm group">
+                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-1">Nama Grup #{idx + 1}</label>
+                        <input
+                          type="text"
+                          value={item.label}
+                          onChange={(e) => setGroupItems(prev => prev.map((g, i) => i === idx ? { ...g, label: e.target.value } : g))}
+                          placeholder="Contoh: Grup Cabang MIPA"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-1">Link WhatsApp</label>
+                        <input
+                          type="url"
+                          value={item.url}
+                          onChange={(e) => setGroupItems(prev => prev.map((g, i) => i === idx ? { ...g, url: e.target.value } : g))}
+                          placeholder="https://chat.whatsapp.com/..."
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setGroupItems(prev => prev.filter((_, i) => i !== idx))}
+                      className="mt-5 p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                      title="Hapus grup ini"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+
+                <div className="flex justify-end pt-2">
                   <button
                     onClick={async () => {
                       setIsSavingGroupLinks(true);
                       try {
+                        // Convert groupItems list to Record<key, url> + label metadata
+                        const linksPayload: Record<string, string> = {};
+                        groupItems.forEach((item) => {
+                          if (item.id && item.url) {
+                            linksPayload[item.id] = item.url;
+                            linksPayload[`${item.id}_label`] = item.label || item.id;
+                          }
+                        });
                         const { saveGroupLinks } = await import('@/app/actions/auth');
-                        const res = await saveGroupLinks(groupLinks);
+                        const res = await saveGroupLinks(linksPayload);
                         if (res.error) throw new Error(res.error);
                         setToastMessage("Tautan Grup WhatsApp berhasil disimpan & disinkronkan!");
                         setTimeout(() => setToastMessage(""), 3000);
