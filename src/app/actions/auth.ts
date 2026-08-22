@@ -1420,16 +1420,10 @@ export async function saveGroupLinks(links: Record<string, string>) {
         })
       : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
 
-    const payload = {
-      title: 'SYS_COMMUNITY_GROUPS',
-      message: 'SYS_COMMUNITY_GROUPS',
-      content: JSON.stringify({
-        ...links,
-        updatedAt: new Date().toISOString()
-      }),
-      type: 'system',
-      target_audience: 'all'
-    };
+    const contentJson = JSON.stringify({
+      ...links,
+      updatedAt: new Date().toISOString()
+    });
 
     const { data: existing } = await client
       .from('announcements')
@@ -1438,16 +1432,29 @@ export async function saveGroupLinks(links: Record<string, string>) {
       .maybeSingle();
 
     if (existing) {
+      // Update: hanya ubah kolom 'content' yang pasti ada
       const { error } = await client
         .from('announcements')
-        .update({ content: payload.content, updated_at: new Date().toISOString() })
+        .update({ content: contentJson })
         .eq('id', existing.id);
-      if (error) throw error;
+      if (error) {
+        console.error("[Server Action] saveGroupLinks UPDATE error:", error.message, error.details);
+        throw error;
+      }
     } else {
+      // Insert baru dengan kolom minimum yang wajib
       const { error } = await client
         .from('announcements')
-        .insert([payload]);
-      if (error) throw error;
+        .insert([{
+          title: 'SYS_COMMUNITY_GROUPS',
+          content: contentJson,
+          type: 'system',
+          target_audience: 'all'
+        }]);
+      if (error) {
+        console.error("[Server Action] saveGroupLinks INSERT error:", error.message, error.details);
+        throw error;
+      }
     }
 
     return { success: true, error: null };
