@@ -1391,13 +1391,14 @@ export async function getGroupLinks() {
       } catch (e) {}
     }
 
+    // Tidak ada data tersimpan — kembalikan data kosong (bukan placeholder sample)
     return {
       data: {
-        general: "https://chat.whatsapp.com/sample-general-ncc",
-        mipa: "https://chat.whatsapp.com/sample-mipa-ncc",
-        lkti: "https://chat.whatsapp.com/sample-lkti-ncc",
-        speech: "https://chat.whatsapp.com/sample-speech-ncc",
-        mtq: "https://chat.whatsapp.com/sample-mtq-ncc"
+        general: "",
+        mipa: "",
+        lkti: "",
+        speech: "",
+        mtq: ""
       },
       error: null
     };
