@@ -859,6 +859,10 @@ export async function getParticipantBroadcasts(
       .neq('title', 'SYS_PORTAL_SETTINGS')
       .neq('title', 'SYSTEM_TIMELINE_CONFIG')
       .neq('title', 'SYS_TOKEN_SETTINGS')
+      .neq('title', 'SYS_COMMUNITY_GROUPS')
+      .neq('title', 'SYS_PAYMENT_CONFIG')
+      .not('title', 'like', 'SYS_%')
+      .not('title', 'like', 'SYSTEM_%')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
