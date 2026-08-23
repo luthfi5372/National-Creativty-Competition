@@ -1166,6 +1166,9 @@ export default function StatusCards({
             }))
             .filter(g => g.scope === 'all' || g.scope === participantScope);
 
+          const makeWaUrl = (phone: string) =>
+            `https://wa.me/${phone}?text=${encodeURIComponent(`Assalamualaikum, saya peserta ${juknisLabel} NCC 13th. Saya ingin bertanya mengenai informasi lomba.`)}`;
+
           const items = [
             { 
               label: "Buku Panduan", 
