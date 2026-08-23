@@ -867,12 +867,29 @@ export async function getParticipantBroadcasts(
 
     if (error) throw error;
 
+    // 🔒 Filter keamanan: buang SEMUA entry sistem dari hasil DB
+    const SYSTEM_TITLE_PREFIXES = ['SYS_', 'SYSTEM_'];
+    const SYSTEM_TITLES_EXACT = [
+      'SYS_PORTAL_SETTINGS', 'SYSTEM_TIMELINE_CONFIG', 'SYS_TOKEN_SETTINGS',
+      'SYS_COMMUNITY_GROUPS', 'SYS_PAYMENT_CONFIG',
+    ];
+    const nonSystemData = (rawData || []).filter((item: any) => {
+      const title = String(item.title || '');
+      // Buang jika title cocok persis dengan daftar sistem
+      if (SYSTEM_TITLES_EXACT.includes(title)) return false;
+      // Buang jika title diawali prefix sistem
+      if (SYSTEM_TITLE_PREFIXES.some(p => title.startsWith(p))) return false;
+      // Buang jika type === 'system'
+      if (item.type === 'system') return false;
+      return true;
+    });
+
     const validIds = new Set<string>();
     if (userId) validIds.add(String(userId).trim());
     if (entryId) validIds.add(String(entryId).trim());
     if (userEmail) validIds.add(String(userEmail).toLowerCase().trim());
 
-    const filtered = (rawData || []).filter((item: any) => {
+    const filtered = nonSystemData.filter((item: any) => {
       // 1. Jika target_audience kosong atau 'All', kirim ke semua
       if (!item.target_audience || item.target_audience === 'All' || item.target_audience === 'all') return true;
       
