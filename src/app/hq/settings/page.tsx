@@ -49,13 +49,20 @@ export default function SettingsDashboard() {
   const [isSavingPaymentConfig, setIsSavingPaymentConfig] = useState(false);
 
   // States for Participant WhatsApp Group Links — DYNAMIC LIST
-  interface GroupLinkItem { id: string; label: string; url: string; }
+  interface GroupLinkItem { id: string; label: string; url: string; scope: string; }
+  const SCOPE_OPTIONS = [
+    { value: 'all', label: '🌐 Umum (Semua Peserta)' },
+    { value: 'mipa', label: '🔬 Olimpiade MIPA' },
+    { value: 'lkti', label: '📄 LKTI Nasional' },
+    { value: 'speech', label: '🎤 English Speech Contest' },
+    { value: 'mtq', label: '🕌 MTQ' },
+  ];
   const [groupItems, setGroupItems] = useState<GroupLinkItem[]>([
-    { id: 'general', label: 'Grup Utama / Seluruh Peserta', url: '' },
-    { id: 'mipa', label: 'Grup Cabang Olimpiade MIPA', url: '' },
-    { id: 'lkti', label: 'Grup Cabang LKTI Nasional', url: '' },
-    { id: 'speech', label: 'Grup Cabang English Speech Contest', url: '' },
-    { id: 'mtq', label: "Grup Cabang MTQ (Musabaqah Tilawatil Qur'an)", url: '' },
+    { id: 'general', label: 'Grup Utama / Seluruh Peserta', url: '', scope: 'all' },
+    { id: 'mipa', label: 'Grup Cabang Olimpiade MIPA', url: '', scope: 'mipa' },
+    { id: 'lkti', label: 'Grup Cabang LKTI Nasional', url: '', scope: 'lkti' },
+    { id: 'speech', label: 'Grup Cabang English Speech Contest', url: '', scope: 'speech' },
+    { id: 'mtq', label: "Grup Cabang MTQ (Musabaqah Tilawatil Qur'an)", url: '', scope: 'mtq' },
   ]);
   const [groupLinks, setGroupLinks] = useState<Record<string, string>>({});
   const [isSavingGroupLinks, setIsSavingGroupLinks] = useState(false);
@@ -164,7 +171,8 @@ export default function SettingsDashboard() {
               const loadedItems = validKeys.map(k => ({
                 id: k,
                 label: saved[`${k}_label`] || keyToLabel(k),
-                url: saved[k] || ''
+                url: saved[k] || '',
+                scope: saved[`${k}_scope`] || 'all',
               }));
               setGroupItems(loadedItems);
             }
@@ -993,7 +1001,7 @@ export default function SettingsDashboard() {
 
                 {groupItems.map((item, idx) => (
                   <div key={item.id} className="flex items-start gap-3 bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm group">
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
                         <label className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-1">Nama Grup #{idx + 1}</label>
                         <input
@@ -1003,6 +1011,18 @@ export default function SettingsDashboard() {
                           placeholder="Contoh: Grup Cabang MIPA"
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
                         />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-1">Tampil Untuk</label>
+                        <select
+                          value={item.scope}
+                          onChange={(e) => setGroupItems(prev => prev.map((g, i) => i === idx ? { ...g, scope: e.target.value } : g))}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        >
+                          {SCOPE_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
                       </div>
                       <div>
                         <label className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-1">Link WhatsApp</label>
@@ -1030,12 +1050,12 @@ export default function SettingsDashboard() {
                     onClick={async () => {
                       setIsSavingGroupLinks(true);
                       try {
-                        // Convert groupItems list to Record<key, url> + label metadata
                         const linksPayload: Record<string, string> = {};
                         groupItems.forEach((item) => {
                           if (item.id && item.url) {
                             linksPayload[item.id] = item.url;
                             linksPayload[`${item.id}_label`] = item.label || item.id;
+                            linksPayload[`${item.id}_scope`] = item.scope || 'all';
                           }
                         });
                         const { saveGroupLinks } = await import('@/app/actions/auth');

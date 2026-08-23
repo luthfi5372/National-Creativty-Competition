@@ -1144,19 +1144,27 @@ export default function StatusCards({
           };
           const cpList = getWhatsAppCPs();
 
-          // Map kategori lomba ke Link Grup WhatsApp resmi
-          const getGroupUrl = () => {
+          // Tentukan scope peserta berdasarkan cabang lomba
+          const participantScope = (() => {
             const cat = (userEntry?.competition_type || userEntry?.category || '').toLowerCase();
-            if (cat.includes('lkti')) return dynamicGroupLinks.lkti || dynamicGroupLinks.general;
-            if (cat.includes('mipa') || cat.includes('olimpiade')) return dynamicGroupLinks.mipa || dynamicGroupLinks.general;
-            if (cat.includes('speech')) return dynamicGroupLinks.speech || dynamicGroupLinks.general;
-            if (cat.includes('mtq')) return dynamicGroupLinks.mtq || dynamicGroupLinks.general;
-            return dynamicGroupLinks.general;
-          };
-          const groupUrl = getGroupUrl();
+            if (cat.includes('lkti')) return 'lkti';
+            if (cat.includes('mipa') || cat.includes('olimpiade')) return 'mipa';
+            if (cat.includes('speech')) return 'speech';
+            if (cat.includes('mtq')) return 'mtq';
+            return 'all';
+          })();
 
-          const makeWaUrl = (phone: string) =>
-            `https://wa.me/${phone}?text=${encodeURIComponent(`Assalamualaikum, saya peserta ${juknisLabel} NCC 13th. Saya ingin bertanya mengenai informasi lomba.`)}`;
+          // Rekonstruksi list grup dari dynamicGroupLinks (format: {id: url, id_label: label, id_scope: scope})
+          const allGroupKeys = Object.keys(dynamicGroupLinks).filter(
+            k => !k.endsWith('_label') && !k.endsWith('_scope') && k !== 'updatedAt' && dynamicGroupLinks[k]
+          );
+          const matchedGroups = allGroupKeys
+            .map(k => ({
+              label: dynamicGroupLinks[`${k}_label`] || k,
+              url: dynamicGroupLinks[k],
+              scope: dynamicGroupLinks[`${k}_scope`] || 'all',
+            }))
+            .filter(g => g.scope === 'all' || g.scope === participantScope);
 
           const items = [
             { 
@@ -1166,13 +1174,14 @@ export default function StatusCards({
               color: "blue",
               href: juknisUrl || "#"
             },
-            ...(groupUrl ? [{
-              label: `Grup WhatsApp ${juknisLabel}`,
-              sub: "Komunitas resmi peserta NCC 13th",
+            // Tampilkan semua grup WA yang match scope peserta
+            ...matchedGroups.map(g => ({
+              label: g.label,
+              sub: "Bergabung ke grup WhatsApp resmi",
               icon: MessageCircle,
               color: "emerald",
-              href: groupUrl
-            }] : []),
+              href: g.url,
+            })),
             { label: "Twibbon Resmi", sub: "Pasang twibbon NCC 13th sekarang!", icon: ImageIcon, color: "purple", href: "https://twb.nz/nationalcreativitycompetition" },
             // Generate 1 atau lebih tombol CP sesuai jumlah CP di juknis
             ...(cpList.length > 0
