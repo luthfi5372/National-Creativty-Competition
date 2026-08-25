@@ -62,7 +62,14 @@ export default function ExamRoom() {
       router.push('/ujian/login');
       return;
     }
-    const parsedUser = JSON.parse(savedUser);
+    let parsedUser: any = null;
+    try {
+      parsedUser = JSON.parse(savedUser);
+    } catch (e) {
+      localStorage.removeItem('ncc_user');
+      router.replace('/ujian/login');
+      return;
+    }
     setStudent(parsedUser);
 
     const loadExamData = async () => {
@@ -413,7 +420,7 @@ export default function ExamRoom() {
               if (!userAnswer) {
                 finalScore += empty_point;
               } else {
-                const selectedLetters = userAnswer.split('');
+                const selectedLetters = String(userAnswer || '').split('');
                 selectedLetters.forEach((l: string) => {
                   const pt = q.options.points[l];
                   if (pt !== undefined) {
@@ -422,16 +429,16 @@ export default function ExamRoom() {
                 });
               }
             } else {
-              // Fixed / Penalty: standard scoring
+              // Fixed / Penalty / Custom without option points: standard scoring
               const correct = String(q.correct_answer || '').trim().toUpperCase();
-              const user    = String(userAnswer).trim().toUpperCase();
+              const user    = String(userAnswer || '').trim().toUpperCase();
 
               if (!user) {
                 // Soal tidak dijawab
                 finalScore += empty_point;
               } else if (user === correct) {
                 // Jawaban benar
-                finalScore += correct_point;
+                finalScore += scoring_system === 'Custom' ? (q.weight ?? correct_point) : correct_point;
               } else {
                 // Jawaban salah — penalty_point biasanya negatif atau 0
                 finalScore += penalty_point <= 0 ? penalty_point : -penalty_point;
@@ -454,15 +461,13 @@ export default function ExamRoom() {
         localStorage.setItem(`cbt_submitted_${examId}`, 'true');
       }
 
-      // 3. Pemicu Animasi Sukses
-      setIsFinished(true); // Memanggil layar biru "BERHASIL TERKIRIM"
-
-      // 4. Jeda 4 detik agar peserta lega, lalu lempar ke Dashboard dengan "Surat Pengantar" (status=success)
+      showToast("Alhamdulillah! Jawaban Anda telah terkirim sempurna ke server pusat.", "success");
       setTimeout(() => {
-        router.replace('/ujian/dashboard?status=success'); 
-      }, 4000);
+        router.push('/ujian/dashboard?status=success');
+      }, 1000);
     } catch (error: any) {
-      alert("GAGAL MENGIRIM DATA: " + error.message);
+      console.error(error);
+      showToast("Terjadi kendala saat mengirim jawaban: " + error.message, "error");
     }
   };
 
@@ -482,9 +487,28 @@ export default function ExamRoom() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f4f7fe] flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-indigo-100 border-t-[#5145cd] rounded-full animate-spin mb-4"></div>
-        <p className="text-[10px] font-black text-[#5145cd] uppercase tracking-widest">Membangun Ruang Ujian Enkripsi...</p>
+      <div className="min-h-screen bg-[#f4f7fe] flex flex-col items-center justify-center space-y-4">
+        <div className="w-12 h-12 border-4 border-indigo-200 border-t-[#5145cd] rounded-full animate-spin"></div>
+        <p className="text-sm font-bold text-gray-500 animate-pulse">Menghubungkan ke Ruang Ujian...</p>
+      </div>
+    );
+  }
+
+  if (isSubmittedLocal) {
+    return (
+      <div className="min-h-screen bg-[#f4f7fe] flex items-center justify-center p-4">
+        <div className="bg-white rounded-[32px] p-8 max-w-md w-full text-center shadow-xl border border-gray-100 space-y-4">
+          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600">
+            <CheckCircleIcon className="w-10 h-10" />
+          </div>
+          <h2 className="text-xl font-black text-gray-800">Ujian Telah Selesai</h2>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Anda telah berhasil menyelesaikan dan mengirimkan sesi ujian ini. Terima kasih atas partisipasi Anda!
+          </p>
+          <button onClick={() => router.push('/ujian/dashboard')} className="w-full py-4 bg-gray-900 hover:bg-black text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all">
+            Kembali ke Dashboard
+          </button>
+        </div>
       </div>
     );
   }

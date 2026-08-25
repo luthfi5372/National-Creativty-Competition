@@ -1591,7 +1591,7 @@ export async function getExamDataServer(examId: string) {
     const [examRes, qRes] = await Promise.all([
       client
         .from('cbt_exams')
-        .select('id, title, token, duration, duration_minutes, is_active, correct_point, penalty_point, empty_point, scoring_system, shuffle_questions')
+        .select('id, title, token, duration_minutes, is_active, correct_point, penalty_point, empty_point, scoring_system, shuffle_questions')
         .eq('id', examId)
         .maybeSingle(),
       client
@@ -1609,6 +1609,34 @@ export async function getExamDataServer(examId: string) {
   } catch (err: any) {
     console.error("[Server Action] Exception getExamDataServer:", err);
     return { exam: null, questions: [], error: err.message || "Gagal mengambil data ujian." };
+  }
+}
+
+/** Mengambil data pengerjaan peserta tanpa membuat sesi baru (Read-only, Bypass RLS) */
+export async function getCbtParticipantAttempt(examId: string, userId: string) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { data: existing, error } = await client
+      .from('cbt_attempts')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('exam_id', examId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return { data: existing || null, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception getCbtParticipantAttempt:", err);
+    return { data: null, error: err.message || "Gagal mengambil status pengerjaan." };
   }
 }
 
@@ -1649,6 +1677,7 @@ export async function initCbtParticipantAttempt(examId: string, userId: string) 
         exam_id: examId,
         violations_count: 0,
         warnings_count: 0,
+        started_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }])
       .select()

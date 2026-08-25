@@ -320,8 +320,10 @@ export default function LiveMonitor() {
   // Timer helper
   const getRemainingTime = (startedAt?: string) => {
     if (!startedAt) return null;
-    const elapsed = (now.getTime() - new Date(startedAt).getTime()) / 1000;
-    const total = examInfo.duration_minutes * 60;
+    const startMs = new Date(startedAt).getTime();
+    if (isNaN(startMs)) return null;
+    const elapsed = Math.max(0, (now.getTime() - startMs) / 1000);
+    const total = (examInfo.duration_minutes || 90) * 60;
     const remaining = Math.max(0, total - elapsed);
     const m = Math.floor(remaining / 60);
     const s = Math.floor(remaining % 60);

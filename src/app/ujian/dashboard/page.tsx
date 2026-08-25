@@ -93,7 +93,15 @@ export default function StudentDashboard() {
   useEffect(() => {
     const savedUser = localStorage.getItem('ncc_user');
     if (!savedUser) { router.push('/ujian/login'); return; }
-    const parsedUser = JSON.parse(savedUser);
+    
+    let parsedUser: any = null;
+    try {
+      parsedUser = JSON.parse(savedUser);
+    } catch (e) {
+      localStorage.removeItem('ncc_user');
+      router.push('/ujian/login');
+      return;
+    }
     setStudent(parsedUser);
 
     const searchParams = new URLSearchParams(window.location.search);
@@ -123,8 +131,9 @@ export default function StudentDashboard() {
 
         const userId = parsedUser.ticket_code || (parsedUser.id ? `NCC-${generateTicketCode(parsedUser.id)}` : (parsedUser.nisn || parsedUser.username));
 
-        const { initCbtParticipantAttempt } = await import('@/app/actions/auth');
-        const { data: existingAttempt } = await initCbtParticipantAttempt(parsedUser.active_exam_id, userId);
+        // ⏱️ Gunakan getCbtParticipantAttempt (HANYA MEMBACA, tidak membuat record baru sebelum peserta mulai ujian)
+        const { getCbtParticipantAttempt } = await import('@/app/actions/auth');
+        const { data: existingAttempt } = await getCbtParticipantAttempt(parsedUser.active_exam_id, userId);
 
         if (existingAttempt) {
           // 🔒 CEK BLOKIR: Jika sudah mencapai 3 pelanggaran dan belum submit

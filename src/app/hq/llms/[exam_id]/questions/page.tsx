@@ -477,11 +477,8 @@ export default function EditorBankSoal() {
             if (opsiE) optionsObj.E = opsiE;
             optionsObj.points = { A: 4, B: 0, C: 0, D: 0, E: 0 };
             // Assign default points
-            const letters = validKunci.split('');
-            letters.forEach(l => {
-              optionsObj.points[l] = 4;
-            });
-            calculatedWeight = Math.max(...Object.values(optionsObj.points).map(Number));
+            const pts = Object.values(optionsObj.points).map(Number);
+            calculatedWeight = pts.length > 0 ? Math.max(0, ...pts) : 4;
           } else if (type === 'isian') {
             optionsObj.points = { correct: 4 };
             calculatedWeight = 4;

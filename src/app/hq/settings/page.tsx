@@ -983,7 +983,7 @@ export default function SettingsDashboard() {
                 <button
                   onClick={() => {
                     const newId = `group_${Date.now()}`;
-                    setGroupItems(prev => [...prev, { id: newId, label: '', url: '' }]);
+                    setGroupItems(prev => [...prev, { id: newId, label: '', url: '', scope: 'all' }]);
                   }}
                   className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all shadow-sm"
                 >

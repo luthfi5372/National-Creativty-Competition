@@ -1217,9 +1217,19 @@ export default function StatusCards({
                   />
                 </div>
               )}
-              <div className={`w-12 h-12 bg-${item.color}-100 text-${item.color}-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all`}>
-                <item.icon size={24} />
-              </div>
+              {(() => {
+                const colorMap: Record<string, string> = {
+                  blue: "bg-blue-100 text-blue-600",
+                  emerald: "bg-emerald-100 text-emerald-600",
+                  purple: "bg-purple-100 text-purple-600",
+                  green: "bg-green-100 text-green-600"
+                };
+                return (
+                  <div className={`w-12 h-12 ${colorMap[item.color] || 'bg-slate-100 text-slate-600'} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all`}>
+                    <item.icon size={24} />
+                  </div>
+                );
+              })()}
               <div>
                 <h4 className="font-bold text-slate-800 text-sm">{item.label}</h4>
                 <p className="text-[11px] text-slate-400 mt-0.5">{item.sub}</p>

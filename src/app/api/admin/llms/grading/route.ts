@@ -156,15 +156,24 @@ export async function POST(request: Request) {
       const key = keyMap.get(answer.question_id);
       if (!key) return;
 
-      if (answer.selected_option && answer.selected_option !== "") {
+      const qType = key.options?.type || 'pg';
+
+      if (qType === 'essay') {
+        const grades = (attempt as any)?.answers?.essay_grades || {};
+        const score = Number(grades[answer.question_id] || 0);
+        totalEarned += score;
+        if (score > 0) correctCount++;
+        if (answer.selected_option && String(answer.selected_option).trim() !== "") {
+          answeredQuestionsCount++;
+        }
+      } else if (answer.selected_option && answer.selected_option !== "") {
         answeredQuestionsCount++;
         
-        const qType = key.options?.type || 'pg';
         if (qType === 'isian') {
           const correctAnswers = String(key.correct_answer || '').toUpperCase().split('|').map(x => x.trim());
           const studentAns = String(answer.selected_option).trim().toUpperCase();
           if (correctAnswers.includes(studentAns)) {
-            totalEarned += Number(key.options?.points?.correct ?? 4);
+            totalEarned += Number(key.options?.points?.correct ?? fixedCorrectPoint ?? 4);
             correctCount++;
           } else {
             wrongCount++;
@@ -172,16 +181,11 @@ export async function POST(request: Request) {
               totalEarned += penaltyPoint < 0 ? penaltyPoint : -penaltyPoint;
             }
           }
-        } else if (qType === 'essay') {
-          const grades = (attempt as any)?.answers?.essay_grades || {};
-          const score = Number(grades[answer.question_id] || 0);
-          totalEarned += score;
-          if (score > 0) correctCount++;
         } else {
           // PG
           // Cek jika ada custom option points di key.options.points
           if (key.options && typeof key.options === 'object' && key.options.points) {
-            const selectedLetters = answer.selected_option.split('');
+            const selectedLetters = String(answer.selected_option || '').split('');
             let questionPoints = 0;
             selectedLetters.forEach((l: string) => {
               const pt = key.options.points[l];

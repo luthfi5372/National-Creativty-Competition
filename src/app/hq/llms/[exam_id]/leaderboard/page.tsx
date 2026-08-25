@@ -360,8 +360,10 @@ export default function LiveLeaderboard() {
       const sA = a.score ?? 0;
       const sB = b.score ?? 0;
       if (sB !== sA) return sB - sA;
-      if (a.violations_count !== b.violations_count) return a.violations_count - b.violations_count;
-      return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
+      if (a.violations_count !== b.violations_count) return (a.violations_count || 0) - (b.violations_count || 0);
+      const tA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+      const tB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      return (isNaN(tA) ? 0 : tA) - (isNaN(tB) ? 0 : tB);
     });
 
     setAttempts(dataUrut);
@@ -497,8 +499,10 @@ export default function LiveLeaderboard() {
               const sA = a.score ?? 0;
               const sB = b.score ?? 0;
               if (sB !== sA) return sB - sA;
-              if (a.violations_count !== b.violations_count) return a.violations_count - b.violations_count;
-              return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
+              if (a.violations_count !== b.violations_count) return (a.violations_count || 0) - (b.violations_count || 0);
+              const tA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+              const tB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+              return (isNaN(tA) ? 0 : tA) - (isNaN(tB) ? 0 : tB);
             });
 
             // Perbarui statistik secara lokal (tanpa kueri jaringan)
