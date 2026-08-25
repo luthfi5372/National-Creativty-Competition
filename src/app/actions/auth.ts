@@ -1341,11 +1341,11 @@ export async function getCbtMonitorData(examId: string) {
     // 3. Ambil data profil & competition_entries untuk enrich nama & sekolah
     const { data: entriesData } = await client
       .from('competition_entries')
-      .select('id, user_id, full_name, school_name, school, category, competition_type, notes, email, nisn');
+      .select('*');
 
     const { data: profilesData } = await client
       .from('profiles')
-      .select('id, full_name, email, school_name');
+      .select('*');
 
     return {
       exam: examData || null,
@@ -1767,11 +1767,12 @@ export async function getLeaderboardDataServer(examId: string) {
         })
       : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
 
-    const [examRes, qRes, aRes, eRes] = await Promise.all([
+    const [examRes, qRes, aRes, eRes, pRes] = await Promise.all([
       client.from('cbt_exams').select('*').eq('id', examId).maybeSingle(),
       client.from('cbt_questions').select('*').eq('exam_id', examId).order('created_at', { ascending: true }),
       client.from('cbt_attempts').select('*').eq('exam_id', examId).order('updated_at', { ascending: false }),
-      client.from('competition_entries').select('id, user_id, full_name, school_name, school, category, competition_type, notes, email, nisn, phone, whatsapp_number, province, city, team_name, mentor_name')
+      client.from('competition_entries').select('*'),
+      client.from('profiles').select('*')
     ]);
 
     let attempts = aRes.data || [];
@@ -1800,6 +1801,7 @@ export async function getLeaderboardDataServer(examId: string) {
       questions: qRes.data || [],
       attempts: attempts,
       entries: eRes.data || [],
+      profiles: pRes.data || [],
       error: null
     };
   } catch (err: any) {

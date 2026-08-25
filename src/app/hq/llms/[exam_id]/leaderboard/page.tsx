@@ -147,10 +147,54 @@ export default function LiveLeaderboard() {
     return false;
   };
 
+  const resolveParticipantInfo = (userId: string | undefined | null) => {
+    if (!userId) {
+      return {
+        full_name: "Peserta NCC",
+        school_name: "Asal Sekolah Tidak Diketahui",
+        email: "",
+        nisn: "",
+        province: "",
+        city: "",
+        category: "",
+        competition_type: "",
+        team_name: "",
+        mentor_name: "",
+        whatsapp: ""
+      };
+    }
+
+    const raw = String(userId).trim();
+    const upper = raw.toUpperCase();
+    const lower = raw.toLowerCase();
+    const clean = upper.replace(/^NCC[-\s]*/i, '');
+    const prefixed = `NCC-${clean}`;
+
+    const found = participantMap[raw] || 
+                  participantMap[upper] || 
+                  participantMap[lower] || 
+                  participantMap[clean] || 
+                  participantMap[prefixed];
+
+    return found || {
+      full_name: "Peserta NCC",
+      school_name: "Asal Sekolah Tidak Diketahui",
+      email: "",
+      nisn: "",
+      province: "",
+      city: "",
+      category: "",
+      competition_type: "",
+      team_name: "",
+      mentor_name: "",
+      whatsapp: ""
+    };
+  };
+
   const fetchLeaderboardData = async () => {
     try {
       const { getLeaderboardDataServer } = await import('@/app/actions/auth');
-      const { exam, questions, attempts: attemptsData, entries, error: sErr } = await getLeaderboardDataServer(examId);
+      const { exam, questions, attempts: attemptsData, entries, profiles, error: sErr } = await getLeaderboardDataServer(examId);
 
       if (sErr) {
         console.error('Gagal mengambil data papan skor:', sErr);
@@ -160,56 +204,102 @@ export default function LiveLeaderboard() {
       setAllQuestions(qList);
       if (exam) setExamConfig(exam);
 
-      if (entries && entries.length > 0) {
-        const pMap: Record<string, any> = {};
-        entries.forEach((entry: any) => {
-          let customTicketCode = "";
-          if (entry.notes) {
-            try {
-              const notesObj = JSON.parse(entry.notes);
-              if (notesObj.custom_ticket_id) {
-                customTicketCode = notesObj.custom_ticket_id.toUpperCase();
-              }
-            } catch (e) {}
-          }
-          
-          const generatedTicketCode = `NCC-${generateTicketCode(entry.id)}`.toUpperCase();
-          
-          const participantInfo = {
-            full_name: entry.full_name,
-            school_name: entry.school_name || entry.school || "",
-            email: entry.email,
-            nisn: entry.nisn,
-            province: entry.province,
-            city: entry.city,
-            category: entry.category,
-            competition_type: entry.competition_type,
-            team_name: entry.team_name,
-            mentor_name: entry.mentor_name,
-            whatsapp: entry.whatsapp_number || entry.phone || "",
-          };
+      const pMap: Record<string, any> = {};
 
-          // 1. Map by generated ticket code (e.g. NCC-9EU5JE)
-          pMap[generatedTicketCode] = participantInfo;
-          pMap[generatedTicketCode.replace("NCC-", "")] = participantInfo;
+      const register = (key: string | number | undefined | null, info: any) => {
+        if (!key) return;
+        const s = String(key).trim();
+        if (!s) return;
+        const u = s.toUpperCase();
+        const l = s.toLowerCase();
+        const c = u.replace(/^NCC[-\s]*/i, '');
+        pMap[s] = info;
+        pMap[u] = info;
+        pMap[l] = info;
+        pMap[c] = info;
+        pMap[`NCC-${c}`] = info;
+      };
 
-          // 2. Map by custom ticket code if available (e.g. NCC-17772)
-          if (customTicketCode) {
-            pMap[customTicketCode] = participantInfo;
-            pMap[customTicketCode.replace("NCC-", "")] = participantInfo;
-          }
+      (entries || []).forEach((entry: any) => {
+        let customTicketCode = "";
+        let notesObj: any = null;
+        if (entry.notes) {
+          try {
+            notesObj = typeof entry.notes === 'string' ? JSON.parse(entry.notes) : entry.notes;
+            if (notesObj?.custom_ticket_id) {
+              customTicketCode = String(notesObj.custom_ticket_id).toUpperCase().trim();
+            } else if (notesObj?.ticket_code) {
+              customTicketCode = String(notesObj.ticket_code).toUpperCase().trim();
+            } else if (notesObj?.ticket_id) {
+              customTicketCode = String(notesObj.ticket_id).toUpperCase().trim();
+            }
+          } catch (e) {}
+        }
+        
+        const generatedFromId = generateTicketCode(entry.id);
+        const generatedFromUserId = entry.user_id ? generateTicketCode(entry.user_id) : "";
 
-          // 3. Map by user_id or email
-          if (entry.user_id) {
-            pMap[String(entry.user_id).toUpperCase()] = participantInfo;
-            pMap[String(entry.user_id).toLowerCase()] = participantInfo;
-          }
-          if (entry.nisn) {
-            pMap[String(entry.nisn)] = participantInfo;
-          }
-        });
-        setParticipantMap(pMap);
-      }
+        const fullName = entry.full_name || entry.name || entry.nama || entry.student_name || entry.nama_lengkap || notesObj?.full_name || notesObj?.name || "Peserta NCC";
+        const schoolName = entry.school_name || entry.school || entry.asal_sekolah || notesObj?.school_name || notesObj?.school || "-";
+        const branch = entry.competition_type || entry.category || entry.branch || notesObj?.competition_type || "";
+
+        const participantInfo = {
+          full_name: fullName,
+          school_name: schoolName,
+          school_origin: schoolName,
+          email: entry.email || notesObj?.email || "",
+          nisn: entry.nisn || notesObj?.nisn || "",
+          province: entry.province || notesObj?.province || "",
+          city: entry.city || notesObj?.city || "",
+          category: entry.category || "",
+          competition_type: branch,
+          team_name: entry.team_name || notesObj?.team_name || "",
+          mentor_name: entry.mentor_name || notesObj?.mentor_name || "",
+          whatsapp: entry.whatsapp_number || entry.phone || notesObj?.phone || "",
+        };
+
+        register(entry.id, participantInfo);
+        register(generatedFromId, participantInfo);
+        register(`NCC-${generatedFromId}`, participantInfo);
+
+        if (entry.user_id) {
+          register(entry.user_id, participantInfo);
+          register(generatedFromUserId, participantInfo);
+          register(`NCC-${generatedFromUserId}`, participantInfo);
+        }
+
+        if (customTicketCode) {
+          register(customTicketCode, participantInfo);
+        }
+
+        if (entry.nisn) register(entry.nisn, participantInfo);
+        if (entry.email) register(entry.email, participantInfo);
+      });
+
+      (profiles || []).forEach((prof: any) => {
+        const profName = prof.full_name || prof.name || "Peserta NCC";
+        const profSchool = prof.school_name || prof.school || "-";
+        const profInfo = {
+          full_name: profName,
+          school_name: profSchool,
+          school_origin: profSchool,
+          email: prof.email || "",
+          nisn: prof.nisn || "",
+          province: prof.province || "",
+          city: prof.city || "",
+          category: "",
+          competition_type: "",
+          team_name: "",
+          mentor_name: "",
+          whatsapp: prof.phone || prof.whatsapp_number || ""
+        };
+
+        register(prof.id, profInfo);
+        register(generateTicketCode(prof.id), profInfo);
+        if (prof.email) register(prof.email, profInfo);
+      });
+
+      setParticipantMap(pMap);
 
       if (attemptsData) {
         prosesDanUrutkanData(attemptsData, qList);
@@ -436,9 +526,7 @@ export default function LiveLeaderboard() {
 
   const filteredAttempts = attempts.filter((item) => {
     const uid = item.user_id ? String(item.user_id).toLowerCase() : '';
-    const codeKey = uid.toUpperCase();
-    const cleanCodeKey = codeKey.replace("NCC-", "");
-    const info = participantMap[codeKey] || participantMap[cleanCodeKey] || { full_name: "", school_name: "" };
+    const info = resolveParticipantInfo(item.user_id);
     const query = searchQuery.toLowerCase();
     return uid.includes(query) || 
            String(info.full_name || '').toLowerCase().includes(query) || 
@@ -474,9 +562,7 @@ export default function LiveLeaderboard() {
 
         filteredAttempts.forEach((item) => {
           const realRank = attempts.findIndex(a => a.id === item.id) + 1;
-          const codeKey = String(item.user_id || '').toUpperCase();
-          const cleanCodeKey = codeKey.replace("NCC-", "");
-          const info = participantMap[codeKey] || participantMap[cleanCodeKey] || { full_name: "Peserta Anonim", school_name: "Asal Sekolah Tidak Diketahui" };
+          const info = resolveParticipantInfo(item.user_id);
 
           questions.forEach((q, index) => {
             const userAns = item.answers?.[q.id];
@@ -699,9 +785,7 @@ export default function LiveLeaderboard() {
             qCols.push(String(pointEarned));
           });
 
-          const codeKey = String(item.user_id || '').toUpperCase();
-          const cleanCodeKey = codeKey.replace("NCC-", "");
-          const info = participantMap[codeKey] || participantMap[cleanCodeKey] || { full_name: "Peserta Anonim", school_name: "Asal Sekolah Tidak Diketahui" };
+          const info = resolveParticipantInfo(item.user_id);
 
           const rowMeta = [
             realRank,
@@ -1587,21 +1671,7 @@ export default function LiveLeaderboard() {
                         {/* ID & BIODATA PESERTA */}
                         <td className="py-4 px-6">
                           {(() => {
-                            const codeKey = String(item.user_id || '').toUpperCase();
-                            const cleanCodeKey = codeKey.replace("NCC-", "");
-                            const info = participantMap[codeKey] || participantMap[cleanCodeKey] || {
-                              full_name: "Peserta Anonim",
-                              school_name: "Asal Sekolah Tidak Diketahui",
-                              email: "",
-                              nisn: "",
-                              province: "",
-                              city: "",
-                              category: "",
-                              competition_type: "",
-                              team_name: "",
-                              mentor_name: "",
-                              whatsapp: ""
-                            };
+                            const info = resolveParticipantInfo(item.user_id);
                             return (
                               <div className="flex flex-col gap-1 text-left">
                                 <div className="flex items-center gap-2">

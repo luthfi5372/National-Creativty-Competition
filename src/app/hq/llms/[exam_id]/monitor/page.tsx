@@ -77,6 +77,36 @@ export default function LiveMonitor() {
     setStats({ working: w, submitted: s, cheating: c });
   }, []);
 
+  const resolveParticipantInfo = (userId: string | undefined | null) => {
+    if (!userId) {
+      return {
+        full_name: "Peserta NCC",
+        school_origin: "-",
+        school_name: "-",
+        branch: ""
+      };
+    }
+
+    const raw = String(userId).trim();
+    const upper = raw.toUpperCase();
+    const lower = raw.toLowerCase();
+    const clean = upper.replace(/^NCC[-\s]*/i, '');
+    const prefixed = `NCC-${clean}`;
+
+    const found = participantMap[raw] || 
+                  participantMap[upper] || 
+                  participantMap[lower] || 
+                  participantMap[clean] || 
+                  participantMap[prefixed];
+
+    return found || {
+      full_name: "Peserta NCC",
+      school_origin: "-",
+      school_name: "-",
+      branch: ""
+    };
+  };
+
   const fetchData = useCallback(async () => {
     if (!examId || examId === 'undefined') return;
     setIsRefreshing(true);
@@ -95,60 +125,85 @@ export default function LiveMonitor() {
       // Build comprehensive participant mapping
       const pMap: Record<string, any> = {};
 
+      const register = (key: string | number | undefined | null, info: any) => {
+        if (!key) return;
+        const s = String(key).trim();
+        if (!s) return;
+        const u = s.toUpperCase();
+        const l = s.toLowerCase();
+        const c = u.replace(/^NCC[-\s]*/i, '');
+        pMap[s] = info;
+        pMap[u] = info;
+        pMap[l] = info;
+        pMap[c] = info;
+        pMap[`NCC-${c}`] = info;
+      };
+
       (entries || []).forEach((entry: any) => {
         let customTicketCode = "";
+        let notesObj: any = null;
         if (entry.notes) {
           try {
-            const notesObj = JSON.parse(entry.notes);
-            if (notesObj.custom_ticket_id) {
-              customTicketCode = notesObj.custom_ticket_id.toUpperCase();
+            notesObj = typeof entry.notes === 'string' ? JSON.parse(entry.notes) : entry.notes;
+            if (notesObj?.custom_ticket_id) {
+              customTicketCode = String(notesObj.custom_ticket_id).toUpperCase().trim();
+            } else if (notesObj?.ticket_code) {
+              customTicketCode = String(notesObj.ticket_code).toUpperCase().trim();
+            } else if (notesObj?.ticket_id) {
+              customTicketCode = String(notesObj.ticket_id).toUpperCase().trim();
             }
           } catch (e) {}
         }
         
-        const generatedTicketCode = `NCC-${generateTicketCode(entry.id)}`.toUpperCase();
-        
+        const generatedFromId = generateTicketCode(entry.id);
+        const generatedFromUserId = entry.user_id ? generateTicketCode(entry.user_id) : "";
+
+        const fullName = entry.full_name || entry.name || entry.nama || entry.student_name || entry.nama_lengkap || notesObj?.full_name || notesObj?.name || "Peserta NCC";
+        const schoolName = entry.school_name || entry.school || entry.asal_sekolah || notesObj?.school_name || notesObj?.school || "-";
+        const branch = entry.competition_type || entry.category || entry.branch || notesObj?.competition_type || "";
+
         const info = {
-          full_name: entry.full_name || "Peserta NCC",
-          school_origin: entry.school_name || entry.school || "-",
-          branch: entry.competition_type || entry.category || ""
+          full_name: fullName,
+          school_origin: schoolName,
+          school_name: schoolName,
+          branch: branch,
+          email: entry.email || notesObj?.email || "",
+          nisn: entry.nisn || notesObj?.nisn || ""
         };
 
-        // Map by generated ticket code
-        pMap[generatedTicketCode] = info;
-        pMap[generatedTicketCode.replace("NCC-", "")] = info;
+        register(entry.id, info);
+        register(generatedFromId, info);
+        register(`NCC-${generatedFromId}`, info);
 
-        // Map by custom ticket code if available
-        if (customTicketCode) {
-          pMap[customTicketCode] = info;
-          pMap[customTicketCode.replace("NCC-", "")] = info;
-        }
-
-        // Map by user_id
         if (entry.user_id) {
-          pMap[String(entry.user_id).toUpperCase()] = info;
-          pMap[String(entry.user_id).toLowerCase()] = info;
+          register(entry.user_id, info);
+          register(generatedFromUserId, info);
+          register(`NCC-${generatedFromUserId}`, info);
         }
 
-        // Map by nisn
-        if (entry.nisn) {
-          pMap[String(entry.nisn)] = info;
+        if (customTicketCode) {
+          register(customTicketCode, info);
         }
 
-        // Map by email
-        if (entry.email) {
-          pMap[String(entry.email).toLowerCase()] = info;
-        }
+        if (entry.nisn) register(entry.nisn, info);
+        if (entry.email) register(entry.email, info);
       });
 
       (profiles || []).forEach((prof: any) => {
-        if (prof.id && !pMap[prof.id]) {
-          pMap[prof.id] = {
-            full_name: prof.full_name || "Peserta",
-            school_origin: prof.school_name || "-",
-            branch: ""
-          };
-        }
+        const profName = prof.full_name || prof.name || "Peserta NCC";
+        const profSchool = prof.school_name || prof.school || "-";
+        const profInfo = {
+          full_name: profName,
+          school_origin: profSchool,
+          school_name: profSchool,
+          branch: "",
+          email: prof.email || "",
+          nisn: prof.nisn || ""
+        };
+
+        register(prof.id, profInfo);
+        register(generateTicketCode(prof.id), profInfo);
+        if (prof.email) register(prof.email, profInfo);
       });
 
       setParticipantMap(pMap);
@@ -441,7 +496,7 @@ export default function LiveMonitor() {
                 {filtered.map(p => {
                   const { isBlocked, isDone, isWarning, isActive } = classify(p);
                   const timer = !isDone ? getRemainingTime(p.started_at) : null;
-                  const info = p.user_id ? (participantMap[p.user_id.toUpperCase()] || participantMap[p.user_id.replace("NCC-", "").toUpperCase()] || { full_name: "", school_origin: "", branch: "" }) : { full_name: "", school_origin: "", branch: "" };
+                  const info = resolveParticipantInfo(p.user_id);
 
                   return (
                     <div key={p.user_id} className={`relative p-4 rounded-[18px] border-2 flex flex-col gap-2.5 transition-all
@@ -569,8 +624,8 @@ export default function LiveMonitor() {
             <p className="text-xs text-gray-500 mt-2 leading-relaxed">
               Pelanggaran <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded font-mono">{unlockUserId}</span> akan direset ke 0.
             </p>
-            {participantMap[unlockUserId]?.full_name && (
-              <p className="text-[11px] text-gray-400 mt-1">({participantMap[unlockUserId].full_name})</p>
+            {resolveParticipantInfo(unlockUserId)?.full_name && (
+              <p className="text-[11px] text-gray-400 mt-1">({resolveParticipantInfo(unlockUserId).full_name})</p>
             )}
             <div className="mt-5 flex gap-3">
               <button onClick={() => setUnlockUserId(null)} disabled={isProcessing}

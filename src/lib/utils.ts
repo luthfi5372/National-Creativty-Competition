@@ -28,16 +28,15 @@ export const generateTicketCode = (id: number | string): string => {
 
   // Hitung seed awal dari ID
   let seed: number;
-  const numId = typeof id === "number" ? id : parseInt(id, 10);
+  const strId = String(id).trim();
 
-  if (!isNaN(numId)) {
-    // Modular multiplication bijection: guaranteed 1-to-1 map (zero collisions)
-    // 3512953 is odd, hence coprime to 32^6 (2^30).
+  // Hanya jika tipe number murni atau string angka bulat
+  if (typeof id === "number" || /^\d+$/.test(strId)) {
+    const numId = typeof id === "number" ? id : parseInt(strId, 10);
     seed = (numId * 3512953 + 1234567) % 1073741824;
   } else {
-    // ID string UUID: hash djb2 yang dimodifikasi
+    // ID string UUID / alfanumerik: hash djb2 yang dimodifikasi
     let hash = 5381;
-    const strId = String(id);
     for (let i = 0; i < strId.length; i++) {
       hash = ((hash << 5) + hash) ^ strId.charCodeAt(i);
       hash = hash >>> 0; // pastikan unsigned 32-bit
