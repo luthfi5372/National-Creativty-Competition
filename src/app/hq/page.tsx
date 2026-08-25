@@ -2437,12 +2437,29 @@ function ModernHQDashboardContent() {
 
     // 3. Eksekusi pengiriman ke database via Server Action (Bypass RLS & Non-Blocking)
     try {
+      let targetUserIdsPayload: string[] = [];
+      if (targetBackup === 'specific') {
+        const selectedEntries = (realEntries || []).filter((e: any) => (selectedBackup || []).includes(e.id));
+        const targetSet = new Set<string>();
+        selectedEntries.forEach((entry: any) => {
+          if (entry.id) targetSet.add(String(entry.id).trim());
+          if (entry.user_id) targetSet.add(String(entry.user_id).trim());
+          if (entry.email) targetSet.add(String(entry.email).toLowerCase().trim());
+          const tCode = getEntryTicketCode(entry);
+          if (tCode) {
+            targetSet.add(String(tCode).trim());
+            targetSet.add(String(tCode).replace(/^NCC-/i, '').trim());
+          }
+        });
+        targetUserIdsPayload = Array.from(targetSet);
+      }
+
       const { postAdminBroadcast } = await import("@/app/actions/auth");
       const { data, error } = await postAdminBroadcast({
         title: titleBackup,
         message: messageBackup,
         target_audience: targetBackup,
-        target_user_ids: targetBackup === 'specific' ? selectedBackup : []
+        target_user_ids: targetBackup === 'specific' ? targetUserIdsPayload : []
       });
 
       if (error) throw new Error(error);
@@ -4653,7 +4670,7 @@ function ModernHQDashboardContent() {
                               if ((selectedUserIds || []).length === entries.length && entries.length > 0) {
                                 setSelectedUserIds([]); // Hapus Semua
                               } else {
-                                setSelectedUserIds(entries.map((e: any) => e.user_id).filter((id: any) => id)); // Pilih Semua
+                                setSelectedUserIds(entries.map((e: any) => e.id).filter(Boolean)); // Pilih Semua
                               }
                             }}
                             className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-1 rounded hover:bg-blue-200 transition-colors"
@@ -4667,9 +4684,8 @@ function ModernHQDashboardContent() {
                             <p className="text-xs text-slate-500 text-center py-4">Belum ada data peserta di sistem.</p>
                           ) : (
                             realEntries.map((entry: any, idx: number) => {
-                              // Gunakan OR fallback agar aman dari undefined
                               const currentSelected = selectedUserIds || [];
-                              const isChecked = currentSelected.includes(entry.user_id);
+                              const isChecked = currentSelected.includes(entry.id);
                               
                               return (
                                 <label key={entry.id || idx} className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all ${isChecked ? 'bg-blue-100/50 border-blue-300' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
@@ -4678,9 +4694,9 @@ function ModernHQDashboardContent() {
                                     checked={isChecked}
                                     onChange={(e) => {
                                       if (e.target.checked) {
-                                        setSelectedUserIds([...currentSelected, entry.user_id]);
+                                        setSelectedUserIds([...currentSelected, entry.id]);
                                       } else {
-                                        setSelectedUserIds(currentSelected.filter((id: any) => id !== entry.user_id));
+                                        setSelectedUserIds(currentSelected.filter((id: any) => id !== entry.id));
                                       }
                                     }}
                                     className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"

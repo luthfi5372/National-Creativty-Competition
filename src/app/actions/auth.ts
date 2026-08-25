@@ -813,9 +813,14 @@ export async function postAdminBroadcast(payload: {
         })
       : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
 
+    const rawTargets = payload.target_audience === 'specific' ? (payload.target_user_ids || []) : [];
+    const cleanTargets = Array.from(new Set(
+      rawTargets.map((t: any) => String(t || '').trim()).filter((t: string) => t.length > 0)
+    ));
+
     const contentPayload = JSON.stringify({
       message: payload.message,
-      target_user_ids: payload.target_audience === 'specific' ? (payload.target_user_ids || []) : []
+      target_user_ids: cleanTargets
     });
 
     // Catatan: kolom 'message' tidak ada di tabel announcements, teks disimpan di kolom 'content'
@@ -912,42 +917,90 @@ export async function getParticipantBroadcasts(
     ];
     const nonSystemData = (rawData || []).filter((item: any) => {
       const title = String(item.title || '');
-      // Buang jika title cocok persis dengan daftar sistem
       if (SYSTEM_TITLES_EXACT.includes(title)) return false;
-      // Buang jika title diawali prefix sistem
       if (SYSTEM_TITLE_PREFIXES.some(p => title.startsWith(p))) return false;
-      // Buang jika type === 'system'
       if (item.type === 'system') return false;
       return true;
     });
 
+    const { generateTicketCode } = await import('@/lib/utils');
     const validIds = new Set<string>();
-    if (userId) validIds.add(String(userId).trim());
-    if (entryId) validIds.add(String(entryId).trim());
-    if (userEmail) validIds.add(String(userEmail).toLowerCase().trim());
+
+    const addId = (val: string | number | undefined | null) => {
+      if (!val) return;
+      const s = String(val).trim();
+      if (!s) return;
+      validIds.add(s);
+      validIds.add(s.toLowerCase());
+      validIds.add(s.toUpperCase());
+      const clean = s.toUpperCase().replace(/^NCC[-\s]*/i, '');
+      validIds.add(clean);
+      validIds.add(`NCC-${clean}`);
+      validIds.add(`ncc-${clean.toLowerCase()}`);
+    };
+
+    addId(userId);
+    addId(entryId);
+    addId(userEmail);
+    if (entryId) addId(generateTicketCode(entryId));
+    if (userId) addId(generateTicketCode(userId));
+
+    const normalizedUserStatus = String(userStatus || 'Pending').toLowerCase().trim();
 
     const filtered = nonSystemData.filter((item: any) => {
-      // 1. Jika target_audience kosong atau 'All', kirim ke semua
-      if (!item.target_audience || item.target_audience === 'All' || item.target_audience === 'all') return true;
+      const targetAudience = String(item.target_audience || 'All').trim();
+      const targetLower = targetAudience.toLowerCase();
+
+      // 1. Jika target_audience kosong atau 'All' / 'all', kirim ke semua peserta
+      if (!item.target_audience || targetLower === 'all' || targetLower === 'semua') {
+        return true;
+      }
       
-      // 2. Jika target audiens cocok dengan status (Verified/Pending)
-      if (item.target_audience.toLowerCase() === userStatus.toLowerCase()) return true;
-      
-      // 3. Jika target audiens spesifik (manual)
-      if (item.target_audience === 'specific' || item.target_audience === 'Spesifik (Manual)') {
+      // 2. Jika target audiens spesifik (manual untuk peserta tertentu)
+      if (targetLower === 'specific' || targetLower === 'spesifik' || targetAudience === 'Spesifik (Manual)') {
         try {
           const parsed = typeof item.content === 'string' ? JSON.parse(item.content) : item.content;
           const targetList: any[] = parsed?.target_user_ids || [];
-          if (!Array.isArray(targetList) || targetList.length === 0) return true; // jika kosong berarti broadcast
+          
+          // 🔒 JIKA TARGET SPESIFIK TAPI LIST KOSONG, JANGAN PERNAH BOCOR KE SEMUA (HARUS FALSE)
+          if (!Array.isArray(targetList) || targetList.length === 0) {
+            return false;
+          }
           
           return targetList.some((targetId: any) => {
-            const strId = String(targetId).toLowerCase().trim();
-            return validIds.has(strId) || (userId && strId === userId.toLowerCase().trim()) || (entryId && strId === entryId.toLowerCase().trim());
+            if (!targetId) return false;
+            const strId = String(targetId).trim();
+            const lowerId = strId.toLowerCase();
+            const upperId = strId.toUpperCase();
+            const cleanId = upperId.replace(/^NCC[-\s]*/i, '');
+
+            return validIds.has(strId) || 
+                   validIds.has(lowerId) || 
+                   validIds.has(upperId) || 
+                   validIds.has(cleanId) || 
+                   validIds.has(`NCC-${cleanId}`);
           });
         } catch (e) {
-          return true;
+          // 🔒 JIKA GAGAL PARSE KONTEN SPESIFIK, JANGAN BOCOR KE UMUM
+          return false;
         }
       }
+
+      // 3. Jika target audiens cocok dengan status (Verified/Pending)
+      if (targetLower === normalizedUserStatus) {
+        return true;
+      }
+
+      // Status 'Verified' / 'Lolos'
+      if ((targetLower === 'verified' || targetLower === 'lolos') && normalizedUserStatus === 'verified') {
+        return true;
+      }
+
+      // Status 'Pending' / 'Belum Lolos'
+      if ((targetLower === 'pending' || targetLower === 'belum lolos') && normalizedUserStatus !== 'verified') {
+        return true;
+      }
+      
       return false;
     });
 
