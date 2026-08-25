@@ -753,12 +753,41 @@ export async function getAdminBroadcasts() {
     const { data, error } = await client
       .from('announcements')
       .select('*')
-      .neq('title', 'SYS_PORTAL_SETTINGS')
-      .neq('title', 'SYSTEM_TIMELINE_CONFIG')
-      .neq('title', 'SYS_TOKEN_SETTINGS')
       .order('created_at', { ascending: false });
 
-    return { data: data || [], error: error ? error.message : null };
+    if (error) throw error;
+
+    const SYSTEM_TITLE_PREFIXES = ['SYS_', 'SYSTEM_'];
+    const SYSTEM_TITLES_EXACT = [
+      'SYS_PORTAL_SETTINGS', 'SYSTEM_TIMELINE_CONFIG', 'SYS_TOKEN_SETTINGS',
+      'SYS_COMMUNITY_GROUPS', 'SYS_PAYMENT_CONFIG',
+    ];
+
+    const cleaned = (data || [])
+      .filter((item: any) => {
+        const title = String(item.title || '');
+        if (SYSTEM_TITLES_EXACT.includes(title)) return false;
+        if (SYSTEM_TITLE_PREFIXES.some(p => title.startsWith(p))) return false;
+        if (item.type === 'system') return false;
+        return true;
+      })
+      .map((item: any) => {
+        let msg = item.message || '';
+        if (!msg && item.content) {
+          try {
+            const parsed = typeof item.content === 'string' ? JSON.parse(item.content) : item.content;
+            msg = parsed?.message || (typeof item.content === 'string' ? item.content : '');
+          } catch (e) {
+            msg = String(item.content || '');
+          }
+        }
+        return {
+          ...item,
+          message: msg
+        };
+      });
+
+    return { data: cleaned, error: null };
   } catch (err: any) {
     console.error("[Server Action] Exception getAdminBroadcasts:", err);
     return { data: [], error: err.message || "Gagal mengambil siaran." };
@@ -771,6 +800,7 @@ export async function postAdminBroadcast(payload: {
   message: string;
   target_audience: string;
   target_user_ids?: string[];
+  type?: string;
 }) {
   try {
     const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
@@ -788,13 +818,14 @@ export async function postAdminBroadcast(payload: {
       target_user_ids: payload.target_audience === 'specific' ? (payload.target_user_ids || []) : []
     });
 
+    // Catatan: kolom 'message' tidak ada di tabel announcements, teks disimpan di kolom 'content'
     const { data, error } = await client
       .from('announcements')
       .insert([
         {
           title: payload.title,
-          message: payload.message,
           content: contentPayload,
+          type: payload.type || 'broadcast',
           target_audience: payload.target_audience
         }
       ])
@@ -802,7 +833,13 @@ export async function postAdminBroadcast(payload: {
       .single();
 
     if (error) throw error;
-    return { data, error: null };
+    return { 
+      data: {
+        ...data,
+        message: payload.message
+      }, 
+      error: null 
+    };
   } catch (err: any) {
     console.error("[Server Action] Exception postAdminBroadcast:", err);
     return { data: null, error: err.message || "Gagal menyiarkan pesan." };

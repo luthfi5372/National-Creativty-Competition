@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { 
@@ -14,7 +14,7 @@ import {
   Trash2,
   Clock
 } from 'lucide-react';
-import { useEffect } from 'react';
+import { getAdminBroadcasts, postAdminBroadcast, deleteAdminBroadcast } from '@/app/actions/auth';
 
 export default function AdminBroadcast() {
   const supabase = createClient();
@@ -31,10 +31,7 @@ export default function AdminBroadcast() {
 
   const fetchHistory = async () => {
     setLoadingHistory(true);
-    const { data } = await supabase
-      .from('announcements')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data } = await getAdminBroadcasts();
     if (data) setHistory(data);
     setLoadingHistory(false);
   };
@@ -44,8 +41,8 @@ export default function AdminBroadcast() {
   }, []);
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from('announcements').delete().eq('id', id);
-    if (!error) fetchHistory();
+    const { success } = await deleteAdminBroadcast(id);
+    if (success) fetchHistory();
   };
 
   const handleSendBroadcast = async (e: React.FormEvent) => {
@@ -56,20 +53,15 @@ export default function AdminBroadcast() {
     setStatus(null);
 
     try {
-      const { error } = await supabase
-        .from('announcements')
-        .insert([
-          { 
-            title: type === 'danger' ? '🚨 Peringatan Darurat' : type === 'warning' ? '⚠️ Peringatan' : '📢 Pengumuman',
-            message: message.trim(),
-            content: message.trim(),
-            type: type,
-            target_audience: 'All',
-            exam_id: null // Set NULL agar terpancar ke seluruh sesi ujian nasional
-          }
-        ]);
+      const title = type === 'danger' ? '🚨 Peringatan Darurat' : type === 'warning' ? '⚠️ Peringatan' : '📢 Pengumuman';
+      const { data, error } = await postAdminBroadcast({
+        title,
+        message: message.trim(),
+        target_audience: 'All',
+        type: type
+      });
 
-      if (error) throw error;
+      if (error) throw new Error(error);
 
       setStatus({ success: true, msg: 'Pengumuman berhasil dipancarkan ke seluruh peserta!' });
       setMessage(''); 
