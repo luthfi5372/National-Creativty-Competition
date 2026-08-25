@@ -1043,7 +1043,7 @@ export async function getActiveExams() {
 
     const { data, error } = await client
       .from('cbt_exams')
-      .select('id, title')
+      .select('id, title, token, duration_minutes, is_active')
       .eq('is_active', true);
 
     return { data: data || [], error: error ? error.message : null };
@@ -1115,16 +1115,10 @@ export async function saveTokenSettings(settings: {
         })
       : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
 
-    const payload = {
-      title: 'SYS_TOKEN_SETTINGS',
-      message: 'SYS_TOKEN_SETTINGS',
-      content: JSON.stringify({
-        ...settings,
-        updatedAt: new Date().toISOString()
-      }),
-      type: 'system',
-      target_audience: 'all'
-    };
+    const contentJson = JSON.stringify({
+      ...settings,
+      updatedAt: new Date().toISOString()
+    });
 
     const { data: existing } = await client
       .from('announcements')
@@ -1133,15 +1127,21 @@ export async function saveTokenSettings(settings: {
       .maybeSingle();
 
     if (existing) {
+      // Update: hanya kolom content yang pasti ada di announcements
       const { error } = await client
         .from('announcements')
-        .update({ content: payload.content, updated_at: new Date().toISOString() })
+        .update({ content: contentJson })
         .eq('id', existing.id);
       if (error) throw error;
     } else {
       const { error } = await client
         .from('announcements')
-        .insert([payload]);
+        .insert([{
+          title: 'SYS_TOKEN_SETTINGS',
+          content: contentJson,
+          type: 'system',
+          target_audience: 'all'
+        }]);
       if (error) throw error;
     }
 
@@ -1218,16 +1218,10 @@ export async function savePaymentConfig(config: {
         })
       : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
 
-    const payload = {
-      title: 'SYS_PAYMENT_CONFIG',
-      message: 'SYS_PAYMENT_CONFIG',
-      content: JSON.stringify({
-        ...config,
-        updatedAt: new Date().toISOString()
-      }),
-      type: 'system',
-      target_audience: 'all'
-    };
+    const contentJson = JSON.stringify({
+      ...config,
+      updatedAt: new Date().toISOString()
+    });
 
     const { data: existing } = await client
       .from('announcements')
@@ -1238,13 +1232,18 @@ export async function savePaymentConfig(config: {
     if (existing) {
       const { error } = await client
         .from('announcements')
-        .update({ content: payload.content, updated_at: new Date().toISOString() })
+        .update({ content: contentJson })
         .eq('id', existing.id);
       if (error) throw error;
     } else {
       const { error } = await client
         .from('announcements')
-        .insert([payload]);
+        .insert([{
+          title: 'SYS_PAYMENT_CONFIG',
+          content: contentJson,
+          type: 'system',
+          target_audience: 'all'
+        }]);
       if (error) throw error;
     }
 

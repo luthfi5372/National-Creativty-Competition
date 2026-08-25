@@ -13,6 +13,8 @@ import {
   Loader2
 } from 'lucide-react';
 
+import { getTokenSettings, getActiveExams } from '@/app/actions/auth';
+
 export default function ParticipantLogin() {
   const router = useRouter();
   const supabase = createClient();
@@ -41,25 +43,17 @@ export default function ParticipantLogin() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const { data: portalData } = await supabase
-          .from('announcements')
-          .select('*')
-          .eq('title', 'SYS_TOKEN_SETTINGS')
-          .maybeSingle();
-
-        if (portalData && portalData.content) {
-          try {
-            const parsed = JSON.parse(portalData.content);
-            setTokenSettings({
-              tokenEnabled: parsed.tokenEnabled ?? true,
-              tokenIntervalMinutes: Number(parsed.tokenIntervalMinutes) || 10,
-              isTokenPaused: Boolean(parsed.isTokenPaused),
-              pausedAt: parsed.pausedAt || null
-            });
-          } catch (e) {}
+        const res = await getTokenSettings();
+        if (res && res.data) {
+          setTokenSettings({
+            tokenEnabled: res.data.tokenEnabled ?? true,
+            tokenIntervalMinutes: Number(res.data.tokenIntervalMinutes) || 10,
+            isTokenPaused: Boolean(res.data.isTokenPaused),
+            pausedAt: res.data.pausedAt || null
+          });
         }
       } catch (err) {
-        console.error("Gagal memuat token settings:", err);
+        console.error("Gagal memuat token settings via Server Action:", err);
       } finally {
         setSettingsLoading(false);
       }
@@ -68,26 +62,31 @@ export default function ParticipantLogin() {
     loadSettings();
 
     const channel = supabase
-      .channel('public:sys_token_settings_login')
+      .channel('public:sys_token_settings_login_' + Date.now())
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'announcements',
-          filter: 'title=eq.SYS_TOKEN_SETTINGS'
+          table: 'announcements'
         },
         (payload: any) => {
-          if (payload.new && payload.new.content) {
-            try {
-              const parsed = JSON.parse(payload.new.content);
-              setTokenSettings({
-                tokenEnabled: parsed.tokenEnabled ?? true,
-                tokenIntervalMinutes: Number(parsed.tokenIntervalMinutes) || 10,
-                isTokenPaused: Boolean(parsed.isTokenPaused),
-                pausedAt: parsed.pausedAt || null
-              });
-            } catch (e) {}
+          if (payload.new && (payload.new.title === 'SYS_TOKEN_SETTINGS' || !payload.new.title)) {
+            if (payload.new.content) {
+              try {
+                const parsed = JSON.parse(payload.new.content);
+                setTokenSettings({
+                  tokenEnabled: parsed.tokenEnabled ?? true,
+                  tokenIntervalMinutes: Number(parsed.tokenIntervalMinutes) || 10,
+                  isTokenPaused: Boolean(parsed.isTokenPaused),
+                  pausedAt: parsed.pausedAt || null
+                });
+              } catch (e) {
+                loadSettings();
+              }
+            } else {
+              loadSettings();
+            }
           }
         }
       )
@@ -214,13 +213,20 @@ export default function ParticipantLogin() {
         setLoading(false); return;
       }
 
-      // ─── LANGKAH 5: Ambil Sesi Ujian Aktif ───────────────────
-      const { data: exams, error: examsError } = await supabase
-        .from('cbt_exams')
-        .select('id, title, token')
-        .eq('is_active', true);
+      // ─── LANGKAH 5: Ambil Sesi Ujian Aktif (RLS Bypass via Server Action) ───
+      let exams: any[] = [];
+      const { data: serverExams, error: serverExamsError } = await getActiveExams();
+      if (serverExams && serverExams.length > 0) {
+        exams = serverExams;
+      } else {
+        const { data: clientExams } = await supabase
+          .from('cbt_exams')
+          .select('id, title, token')
+          .eq('is_active', true);
+        exams = clientExams || [];
+      }
 
-      if (examsError || !exams || exams.length === 0) {
+      if (!exams || exams.length === 0) {
         setErrorMsg({ title: 'Tidak Ada Ujian Aktif', desc: 'Panitia belum membuka sesi ujian apapun saat ini.' });
         setLoading(false); return;
       }

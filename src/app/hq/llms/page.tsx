@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { getLLMSTelemetryData } from "@/app/actions/auth";
+import { getLLMSTelemetryData, getTokenSettings } from "@/app/actions/auth";
 import { 
   LayoutGrid, Users, BadgeCheck, Megaphone, 
   Calendar, Image as ImageIcon, Server, Settings,
@@ -61,7 +61,8 @@ export default function IntegratedLLMSDashboard() {
   const [showSecurityModal, setShowSecurityModal] = useState(false);
   const [allSecurityLogs, setAllSecurityLogs] = useState<any[]>([]);
 
-  // ⚙️ Global Token Settings State
+  // ⚙️ Global Token Settings State & Live Tick for Instant 0-Delay Rotation
+  const [liveTick, setLiveTick] = useState(0);
   const [globalTokenConfig, setGlobalTokenConfig] = useState<{
     tokenEnabled: boolean;
     tokenIntervalMinutes: number;
@@ -73,6 +74,14 @@ export default function IntegratedLLMSDashboard() {
     isTokenPaused: false,
     pausedAt: null
   });
+
+  // Live timer tick so all session cards re-render synchronously with zero delay when rotation hits
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLiveTick(t => (t + 1) % 1000000);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Auto-dismiss shuffle popup — single setTimeout, zero interval re-renders
   useEffect(() => {
@@ -90,53 +99,50 @@ export default function IntegratedLLMSDashboard() {
     };
     fetchEntryCount();
 
-    // Fetch token settings
+    // Fetch token settings via Server Action
     const fetchTokenConfig = async () => {
       try {
-        const { data } = await supabase
-          .from('announcements')
-          .select('*')
-          .eq('title', 'SYS_TOKEN_SETTINGS')
-          .maybeSingle();
-
-        if (data && data.content) {
-          try {
-            const parsed = JSON.parse(data.content);
-            setGlobalTokenConfig({
-              tokenEnabled: parsed.tokenEnabled ?? true,
-              tokenIntervalMinutes: Number(parsed.tokenIntervalMinutes) || 10,
-              isTokenPaused: Boolean(parsed.isTokenPaused),
-              pausedAt: parsed.pausedAt || null
-            });
-          } catch (e) {}
+        const res = await getTokenSettings();
+        if (res && res.data) {
+          setGlobalTokenConfig({
+            tokenEnabled: res.data.tokenEnabled ?? true,
+            tokenIntervalMinutes: Number(res.data.tokenIntervalMinutes) || 10,
+            isTokenPaused: Boolean(res.data.isTokenPaused),
+            pausedAt: res.data.pausedAt || null
+          });
         }
       } catch (err) {
-        console.error("Gagal memuat token settings:", err);
+        console.error("Gagal memuat token settings via Server Action:", err);
       }
     };
     fetchTokenConfig();
 
     const tokenChannel = supabase
-      .channel('public:sys_token_settings_hq')
+      .channel('public:sys_token_settings_hq_' + Date.now())
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'announcements',
-          filter: 'title=eq.SYS_TOKEN_SETTINGS'
+          table: 'announcements'
         },
         (payload: any) => {
-          if (payload.new && payload.new.content) {
-            try {
-              const parsed = JSON.parse(payload.new.content);
-              setGlobalTokenConfig({
-                tokenEnabled: parsed.tokenEnabled ?? true,
-                tokenIntervalMinutes: Number(parsed.tokenIntervalMinutes) || 10,
-                isTokenPaused: Boolean(parsed.isTokenPaused),
-                pausedAt: parsed.pausedAt || null
-              });
-            } catch (e) {}
+          if (payload.new && (payload.new.title === 'SYS_TOKEN_SETTINGS' || !payload.new.title)) {
+            if (payload.new.content) {
+              try {
+                const parsed = JSON.parse(payload.new.content);
+                setGlobalTokenConfig({
+                  tokenEnabled: parsed.tokenEnabled ?? true,
+                  tokenIntervalMinutes: Number(parsed.tokenIntervalMinutes) || 10,
+                  isTokenPaused: Boolean(parsed.isTokenPaused),
+                  pausedAt: parsed.pausedAt || null
+                });
+              } catch (e) {
+                fetchTokenConfig();
+              }
+            } else {
+              fetchTokenConfig();
+            }
           }
         }
       )
