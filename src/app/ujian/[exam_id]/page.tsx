@@ -45,16 +45,26 @@ export default function ExamRoom() {
   const [isBlocked, setIsBlocked] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [isForceSubmitted, setIsForceSubmitted] = useState(false);
+  const [isSubmittedLocal, setIsSubmittedLocal] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({ visible: false, message: '', type: 'success' });
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3500);
+  };
 
   useEffect(() => {
     // 🔥 PENCEGAHAN ERROR: Jangan jalankan query jika ID ujian masih "undefined"
     if (!examId || examId === 'undefined') return;
 
     // 🔥 PENGUNCI INSTAN LOKAL: Deteksi cache lokal pengerjaan selesai sebelum panggil jaringan
-    const isLocalSubmitted = localStorage.getItem(`cbt_submitted_${examId}`) === 'true';
-    if (isLocalSubmitted) {
-      router.replace('/ujian/dashboard');
-      return;
+    if (typeof window !== 'undefined') {
+      const isLocalSubmitted = localStorage.getItem(`cbt_submitted_${examId}`) === 'true';
+      if (isLocalSubmitted) {
+        setIsSubmittedLocal(true);
+        setLoading(false);
+        return;
+      }
     }
 
     const savedUser = localStorage.getItem('ncc_user');
@@ -807,6 +817,14 @@ export default function ExamRoom() {
           </div>
         </div>
       </div>
+
+      {/* Floating Toast Notification */}
+      <div className={`fixed bottom-6 right-6 z-[250] transition-all duration-300 transform ${toast.visible ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0 pointer-events-none'}`}>
+        <div className={`px-5 py-3 rounded-2xl shadow-xl border text-xs font-bold flex items-center gap-2 ${toast.type === 'success' ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-rose-600 text-white border-rose-500'}`}>
+          <span>{toast.message}</span>
+        </div>
+      </div>
+
     </div>
   );
 }
