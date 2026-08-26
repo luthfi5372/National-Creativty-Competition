@@ -231,7 +231,7 @@ export default function EditorBankSoal() {
         const values = Object.keys(optionPoints)
           .filter(k => visibleOptions.includes(k))
           .map(k => Number(optionPoints[k] ?? 0));
-        calculatedWeight = values.length > 0 ? Math.max(...values) : 4;
+        calculatedWeight = values.length > 0 ? Math.max(0, ...values) : 4;
       } else if (questionType === 'isian') {
         calculatedWeight = Number(optionPoints.correct ?? 4);
       } else if (questionType === 'essay') {

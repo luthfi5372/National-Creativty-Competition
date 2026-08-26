@@ -94,7 +94,7 @@ export default function LiveLeaderboard() {
     // Multiple Choice (PG)
     if (q.options && typeof q.options === 'object' && q.options.points) {
       // Custom points per option
-      const selectedLetters = userAnswer.split('');
+      const selectedLetters = String(userAnswer || '').split('');
       let pts = 0;
       selectedLetters.forEach((l: string) => {
         pts += Number(q.options.points[l] || 0);
@@ -105,7 +105,7 @@ export default function LiveLeaderboard() {
       const correct = String(correctKey).trim().toUpperCase();
       const user = String(userAnswer).trim().toUpperCase();
       if (user === correct) {
-        return examConfig?.correct_point ?? 4;
+        return examConfig?.scoring_system === 'Custom' ? (q.weight ?? examConfig?.correct_point ?? 4) : (examConfig?.correct_point ?? 4);
       } else {
         const penalty = examConfig?.penalty_point || 0;
         return penalty <= 0 ? penalty : -penalty;

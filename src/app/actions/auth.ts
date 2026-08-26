@@ -1791,6 +1791,7 @@ export async function submitCbtExamAnswers(examId: string, userId: string, answe
       score: score,
       final_score: score,
       status: 'submitted',
+      submitted_at: nowIso,
       updated_at: nowIso
     };
 
