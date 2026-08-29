@@ -15,7 +15,16 @@ import {
   Upload,
   XCircle,
   Loader2,
-  BookOpen
+  BookOpen,
+  Plus,
+  Layers,
+  CheckSquare,
+  Square,
+  Save,
+  X,
+  Tag,
+  Filter,
+  SlidersHorizontal
 } from 'lucide-react';
 import katex from "katex";
 import "katex/dist/katex.min.css";
@@ -105,8 +114,16 @@ export default function EditorBankSoal() {
     }
   };
   
+  // 📚 State Mata Pelajaran & Filter
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [examSubjects, setExamSubjects] = useState<string[]>([]);
+  const [examSubjectConfig, setExamSubjectConfig] = useState<{ name: string; count: number }[]>([]);
+  const [filterSubject, setFilterSubject] = useState<string>('ALL');
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
+  const [showManageSubjectModal, setShowManageSubjectModal] = useState<boolean>(false);
+  const [isSavingSubjectConfig, setIsSavingSubjectConfig] = useState<boolean>(false);
+  const [isBatchUpdating, setIsBatchUpdating] = useState<boolean>(false);
+  const [modalSubjectList, setModalSubjectList] = useState<{ name: string; count: number }[]>([]);
 
   // State Mode Edit & Gambar
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -138,16 +155,21 @@ export default function EditorBankSoal() {
         .eq('id', examId)
         .maybeSingle()
     ]);
-    if (data) {
-      const strictlyFiltered = data.filter((q: any) => q.exam_id === examId);
-      setDaftarSoal(strictlyFiltered);
-    }
-    if (examData?.subject_config && Array.isArray(examData.subject_config)) {
-      const subjects = (examData.subject_config as any[])
-        .map((s: any) => String(s.name || ''))
-        .filter((n: string) => n.trim() !== '');
-      setExamSubjects(subjects);
-    }
+
+    const loadedQuestions = data ? data.filter((q: any) => q.exam_id === examId) : [];
+    setDaftarSoal(loadedQuestions);
+
+    const subConf: { name: string; count: number }[] = (examData?.subject_config && Array.isArray(examData.subject_config))
+      ? (examData.subject_config as any[])
+      : [];
+    setExamSubjectConfig(subConf);
+    setModalSubjectList(subConf.length > 0 ? subConf : []);
+
+    // Kumpulkan seluruh mapel unik dari konfigurasi sesi DAN dari record soal yang sudah ada
+    const configSubjects = subConf.map((s: any) => String(s.name || '')).filter((n: string) => n.trim() !== '');
+    const questionSubjects = loadedQuestions.map((q: any) => String(q.subject || '')).filter((n: string) => n.trim() !== '');
+    const uniqueSubjects = Array.from(new Set([...configSubjects, ...questionSubjects]));
+    setExamSubjects(uniqueSubjects);
   };
 
   useEffect(() => {
@@ -554,6 +576,69 @@ export default function EditorBankSoal() {
     if(editingId === id) resetForm();
   };
 
+  const handleQuickSetSubject = async (questionId: string, subjectName: string | null) => {
+    const finalSubject = subjectName ? subjectName.trim() : null;
+    try {
+      const { error } = await supabase
+        .from('cbt_questions')
+        .update({ subject: finalSubject })
+        .eq('id', questionId);
+
+      if (error) throw error;
+
+      setDaftarSoal(prev => prev.map(q => q.id === questionId ? { ...q, subject: finalSubject } : q));
+      showToast(finalSubject ? `Soal berhasil diubah ke mapel "${finalSubject}"` : "Soal diubah ke kategori Umum", "success");
+    } catch (err: any) {
+      showToast(`Gagal mengubah mapel: ${err.message}`, "error");
+    }
+  };
+
+  const handleBatchSetSubject = async (targetSubject: string | null) => {
+    if (selectedQuestionIds.length === 0) return;
+    const finalSubject = (targetSubject === '__CLEAR__' || !targetSubject) ? null : targetSubject.trim();
+    setIsBatchUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('cbt_questions')
+        .update({ subject: finalSubject })
+        .in('id', selectedQuestionIds);
+
+      if (error) throw error;
+
+      setDaftarSoal(prev => prev.map(q => selectedQuestionIds.includes(q.id) ? { ...q, subject: finalSubject } : q));
+      showToast(`Berhasil memindahkan ${selectedQuestionIds.length} soal ke mapel ${finalSubject || 'Umum'}!`, "success");
+      setSelectedQuestionIds([]);
+    } catch (err: any) {
+      showToast(`Gagal update massal: ${err.message}`, "error");
+    } finally {
+      setIsBatchUpdating(false);
+    }
+  };
+
+  const handleSaveSubjectConfig = async (newConfig: { name: string; count: number }[]) => {
+    setIsSavingSubjectConfig(true);
+    try {
+      const { error } = await supabase
+        .from('cbt_exams')
+        .update({ subject_config: newConfig })
+        .eq('id', examId);
+
+      if (error) throw error;
+
+      setExamSubjectConfig(newConfig);
+      const configSubjects = newConfig.map(s => s.name).filter(n => n && n.trim() !== '');
+      const questionSubjects = daftarSoal.map(q => String(q.subject || '')).filter(n => n.trim() !== '');
+      const uniqueSubs = Array.from(new Set([...configSubjects, ...questionSubjects]));
+      setExamSubjects(uniqueSubs);
+      showToast("Konfigurasi mata pelajaran berhasil disimpan!", "success");
+      setShowManageSubjectModal(false);
+    } catch (err: any) {
+      showToast(`Gagal simpan mapel: ${err.message}`, "error");
+    } finally {
+      setIsSavingSubjectConfig(false);
+    }
+  };
+
   const resetForm = () => {
     setSoal('');
     setSelectedSubject('');
@@ -585,8 +670,19 @@ export default function EditorBankSoal() {
           </div>
         </div>
 
-        {/* AREA IMPORT EXCEL/CSV */}
-        <div className="flex items-center space-x-3">
+        {/* AREA KELOLA MAPEL & IMPORT EXCEL/CSV */}
+        <div className="flex items-center flex-wrap gap-2.5">
+          <button
+            onClick={() => {
+              setModalSubjectList(examSubjectConfig.length > 0 ? examSubjectConfig : examSubjects.map(s => ({ name: s, count: 0 })));
+              setShowManageSubjectModal(true);
+            }}
+            className="flex items-center px-4 py-2 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded-xl text-xs font-bold tracking-wide transition-all shadow-sm active:scale-95"
+          >
+            <Layers className="w-4 h-4 mr-2 text-purple-600" />
+            Kelola Mapel ({examSubjects.length})
+          </button>
+
           <Link 
             href={`/hq/llms/${examId}/tutorial-csv`}
             className="flex items-center px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-100 rounded-xl text-xs font-bold tracking-wide transition-all shadow-sm"
@@ -822,18 +918,63 @@ export default function EditorBankSoal() {
             )}
           </div>
 
-          {examSubjects.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-xs font-black uppercase text-slate-500 tracking-widest">Mata Pelajaran</label>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setSelectedSubject('')} className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2 ${selectedSubject === '' ? 'bg-slate-700 text-white border-slate-700' : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-slate-400'}`}>Umum</button>
-                {examSubjects.map(subj => (
-                  <button key={subj} type="button" onClick={() => setSelectedSubject(selectedSubject === subj ? '' : subj)} className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2 ${selectedSubject === subj ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-indigo-300'}`}>{subj}</button>
-                ))}
-              </div>
-              {selectedSubject && <p className="text-[9px] text-indigo-500 font-bold">📌 Soal ini masuk mapel: {selectedSubject}</p>}
+          {/* 📚 SELEKTOR MATA PELAJARAN DI FORM INPUT */}
+          <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-indigo-600" />
+                Mata Pelajaran (Mapel)
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalSubjectList(examSubjectConfig.length > 0 ? examSubjectConfig : examSubjects.map(s => ({ name: s, count: 0 })));
+                  setShowManageSubjectModal(true);
+                }}
+                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 hover:underline"
+              >
+                <Plus className="w-3 h-3" /> Tambah / Kelola Mapel
+              </button>
             </div>
-          )}
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedSubject('')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2 ${
+                  selectedSubject === ''
+                    ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
+                    : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                Umum (Tanpa Mapel)
+              </button>
+              {examSubjects.map(subj => (
+                <button
+                  key={subj}
+                  type="button"
+                  onClick={() => setSelectedSubject(selectedSubject === subj ? '' : subj)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2 ${
+                    selectedSubject === subj
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                      : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300'
+                  }`}
+                >
+                  {subj}
+                </button>
+              ))}
+            </div>
+
+            {selectedSubject ? (
+              <p className="text-[10px] text-indigo-600 font-bold">
+                📌 Soal ini akan disimpan ke dalam kategori mapel: <b>{selectedSubject}</b>
+              </p>
+            ) : (
+              <p className="text-[10px] text-slate-400 font-medium">
+                Soal ini masuk kategori Umum (dikerjakan secara normal jika tidak memakai mode acak mapel).
+              </p>
+            )}
+          </div>
 
           {/* AKSI TOMBOL UTAMA */}
           <div className="flex space-x-3 mt-8">
@@ -954,25 +1095,87 @@ export default function EditorBankSoal() {
       </div>
 
       {/* --- DAFTAR HASIL PENYIMPANAN DATA --- */}
-      <div className="max-w-6xl mx-auto mt-12 mb-20 text-left">
-        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center flex-wrap gap-3">
-          Soal Terdaftar
-          <span className="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full">{daftarSoal.length}</span>
-          {/* Counter soal belum ada jawaban */}
-          {(() => {
-            const noAnswer = daftarSoal.filter(q => !isCorrectAnswerValid(q));
-            if (noAnswer.length === 0) return (
-              <span className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full">
-                <CheckCircle className="w-3.5 h-3.5" /> Semua soal lengkap
-              </span>
-            );
-            return (
-              <span className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold px-3 py-1 rounded-full animate-pulse">
-                <XCircle className="w-3.5 h-3.5" /> {noAnswer.length} soal belum ada kunci jawaban
-              </span>
-            );
-          })()}
-        </h3>
+      <div className="max-w-6xl mx-auto mt-12 mb-28 text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center flex-wrap gap-3">
+            <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              Soal Terdaftar
+              <span className="bg-indigo-100 text-indigo-700 text-sm font-black px-3 py-1 rounded-full">{daftarSoal.length}</span>
+            </h3>
+
+            {/* Counter soal belum ada jawaban */}
+            {(() => {
+              const noAnswer = daftarSoal.filter(q => !isCorrectAnswerValid(q));
+              if (noAnswer.length === 0) return (
+                <span className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full">
+                  <CheckCircle className="w-3.5 h-3.5" /> Semua soal lengkap
+                </span>
+              );
+              return (
+                <span className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold px-3 py-1 rounded-full animate-pulse">
+                  <XCircle className="w-3.5 h-3.5" /> {noAnswer.length} belum ada kunci
+                </span>
+              );
+            })()}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setModalSubjectList(examSubjectConfig.length > 0 ? examSubjectConfig : examSubjects.map(s => ({ name: s, count: 0 })));
+                setShowManageSubjectModal(true);
+              }}
+              className="flex items-center px-3.5 py-2 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+            >
+              <Layers className="w-3.5 h-3.5 mr-1.5 text-purple-600" />
+              Kelola Mapel
+            </button>
+          </div>
+        </div>
+
+        {/* 🏷️ FILTER TABS PER MATA PELAJARAN */}
+        {daftarSoal.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-5 scrollbar-thin">
+            <button
+              onClick={() => setFilterSubject('ALL')}
+              className={`px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-all border ${
+                filterSubject === 'ALL'
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              Semua ({daftarSoal.length})
+            </button>
+
+            <button
+              onClick={() => setFilterSubject('UNASSIGNED')}
+              className={`px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-all border ${
+                filterSubject === 'UNASSIGNED'
+                  ? 'bg-slate-800 text-white border-slate-800 shadow-md shadow-slate-200'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              Umum / Belum Ada Mapel ({daftarSoal.filter(q => !q.subject || q.subject.trim() === '').length})
+            </button>
+
+            {examSubjects.map(subj => {
+              const countInSubj = daftarSoal.filter(q => (q.subject || '').toLowerCase() === subj.toLowerCase()).length;
+              return (
+                <button
+                  key={subj}
+                  onClick={() => setFilterSubject(subj)}
+                  className={`px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-all border ${
+                    filterSubject.toLowerCase() === subj.toLowerCase()
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {subj} ({countInSubj})
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Banner peringatan jika ada soal tidak lengkap */}
         {daftarSoal.some(q => !isCorrectAnswerValid(q)) && (
@@ -981,146 +1184,378 @@ export default function EditorBankSoal() {
             <div>
               <p className="text-xs font-black text-amber-700 uppercase tracking-widest">Perhatian — Soal Tidak Lengkap</p>
               <p className="text-xs text-amber-600 font-semibold mt-0.5 leading-relaxed">
-                Soal yang ditandai merah belum memiliki kunci jawaban yang valid. Peserta tetap bisa mengerjakan soal tersebut,
-                namun sistem tidak dapat menghitung skor secara akurat. Segera edit dan tentukan kunci jawaban yang benar.
+                Soal yang ditandai merah belum memiliki kunci jawaban yang valid. Klik tombol <b>Edit</b> pada soal untuk mengisi kunci jawaban.
               </p>
             </div>
           </div>
         )}
         
-        {daftarSoal.length === 0 ? (
-          <div className="bg-white p-12 rounded-3xl border-2 border-dashed border-gray-200 text-center text-gray-400 font-medium">
-            Belum ada susunan soal yang terdaftar di database untuk sesi ini.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 text-left">
-            {daftarSoal.map((item, index) => (
-              <div key={item.id} className={`bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row justify-between items-start hover:shadow-md transition-all
-                ${editingId === item.id
-                  ? 'border-amber-400 ring-1 ring-amber-400 bg-amber-50/10'
-                  : !isCorrectAnswerValid(item)
-                    ? 'border-rose-300 ring-1 ring-rose-200 bg-rose-50/20'
-                    : 'border-gray-100'}`}>
-                
-                <div className="flex-grow w-full md:pr-6 text-left">
-                  {(() => {
-                    const qType = item.options?.type || 'pg';
-                    return (
-                      <>
-                        <div className="flex items-center mb-3 flex-wrap gap-2">
-                          <span className="bg-slate-800 text-white text-xs font-bold px-2.5 py-1 rounded-md">Soal {daftarSoal.length - index}</span>
-                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border
-                            ${item.difficulty === 'Hard' ? 'bg-red-50 text-red-600 border-red-100' : 
-                              item.difficulty === 'Easy' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                              'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                            {item.difficulty || 'Medium'}
-                          </span>
-                          {item.subject && (
-                            <span className="px-2 py-0.5 rounded-lg text-[9px] font-black bg-indigo-100 text-indigo-600 border border-indigo-200">
-                              {item.subject}
+        {(() => {
+          const filteredSoal = daftarSoal.filter(item => {
+            if (filterSubject === 'ALL') return true;
+            if (filterSubject === 'UNASSIGNED') return !item.subject || item.subject.trim() === '';
+            return (item.subject || '').toLowerCase() === filterSubject.toLowerCase();
+          });
+
+          const isAllVisibleSelected = filteredSoal.length > 0 && filteredSoal.every(q => selectedQuestionIds.includes(q.id));
+
+          if (daftarSoal.length === 0) {
+            return (
+              <div className="bg-white p-12 rounded-3xl border-2 border-dashed border-gray-200 text-center text-gray-400 font-medium">
+                Belum ada susunan soal yang terdaftar di database untuk sesi ini.
+              </div>
+            );
+          }
+
+          if (filteredSoal.length === 0) {
+            return (
+              <div className="bg-white p-12 rounded-3xl border-2 border-dashed border-gray-200 text-center text-gray-400 font-medium space-y-2">
+                <p>Tidak ada soal pada kategori mapel ini.</p>
+                <button
+                  onClick={() => setFilterSubject('ALL')}
+                  className="text-xs text-indigo-600 font-bold hover:underline"
+                >
+                  Lihat Semua Soal
+                </button>
+              </div>
+            );
+          }
+
+          return (
+            <div className="space-y-4">
+              {/* Opsi Pilih Semua untuk Aksi Massal */}
+              <div className="flex items-center justify-between bg-white px-5 py-3 rounded-2xl border border-slate-200/80 shadow-xs">
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isAllVisibleSelected}
+                    onChange={() => {
+                      const visibleIds = filteredSoal.map(q => q.id);
+                      if (isAllVisibleSelected) {
+                        setSelectedQuestionIds(prev => prev.filter(id => !visibleIds.includes(id)));
+                      } else {
+                        setSelectedQuestionIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+                      }
+                    }}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer"
+                  />
+                  <span>Pilih Semua Soal di Tab Ini ({filteredSoal.length} soal)</span>
+                </label>
+
+                {selectedQuestionIds.length > 0 && (
+                  <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-xl border border-indigo-100">
+                    {selectedQuestionIds.length} Soal Dipilih
+                  </span>
+                )}
+              </div>
+
+              {/* LIST KARTU SOAL */}
+              <div className="grid grid-cols-1 gap-4 text-left">
+                {filteredSoal.map((item, index) => {
+                  const isSelected = selectedQuestionIds.includes(item.id);
+                  const qType = item.options?.type || 'pg';
+                  
+                  return (
+                    <div 
+                      key={item.id} 
+                      className={`bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row justify-between items-start hover:shadow-md transition-all relative ${
+                        isSelected 
+                          ? 'border-indigo-500 ring-2 ring-indigo-200 bg-indigo-50/10'
+                          : editingId === item.id
+                            ? 'border-amber-400 ring-1 ring-amber-400 bg-amber-50/10'
+                            : !isCorrectAnswerValid(item)
+                              ? 'border-rose-300 ring-1 ring-rose-200 bg-rose-50/20'
+                              : 'border-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3 flex-grow w-full md:pr-6 text-left">
+                        {/* Checkbox Pilih Per-Soal */}
+                        <div className="pt-1">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {
+                              setSelectedQuestionIds(prev => 
+                                isSelected ? prev.filter(id => id !== item.id) : [...prev, item.id]
+                              );
+                            }}
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="flex-grow min-w-0">
+                          <div className="flex items-center mb-3 flex-wrap gap-2">
+                            <span className="bg-slate-800 text-white text-xs font-bold px-2.5 py-1 rounded-md">
+                              Soal #{daftarSoal.findIndex(q => q.id === item.id) + 1}
                             </span>
+                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${
+                              item.difficulty === 'Hard' ? 'bg-red-50 text-red-600 border-red-100' : 
+                                item.difficulty === 'Easy' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                'bg-amber-50 text-amber-600 border-amber-100'
+                            }`}>
+                              {item.difficulty || 'Medium'}
+                            </span>
+
+                            {/* 🏷️ QUICK MAPEL SELECTOR PER-SOAL (1-CLICK SYNC KE DB) */}
+                            <div className="relative inline-flex items-center">
+                              <select
+                                value={item.subject || ''}
+                                onChange={(e) => handleQuickSetSubject(item.id, e.target.value || null)}
+                                className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border outline-none cursor-pointer transition-all ${
+                                  item.subject
+                                    ? 'bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-400 font-bold'
+                                    : 'bg-slate-100 text-slate-600 border-slate-200 hover:border-slate-300'
+                                }`}
+                              >
+                                <option value="">🏷️ Mapel: Umum</option>
+                                {examSubjects.map(s => (
+                                  <option key={s} value={s}>🏷️ Mapel: {s}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <span className="bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase px-2 py-0.5 rounded border border-indigo-100">
+                              {qType === 'pg' ? 'Pilihan Ganda' : qType === 'isian' ? 'Isian Singkat' : 'Essai Bebas'}
+                            </span>
+
+                            {!isCorrectAnswerValid(item) && (
+                              <span className="flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded border bg-rose-50 text-rose-600 border-rose-200">
+                                <XCircle className="w-3 h-3" /> Belum Ada Kunci Jawaban
+                              </span>
+                            )}
+
+                            {isCorrectAnswerValid(item) && qType !== 'essay' && (
+                              <span className="flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded border bg-emerald-50 text-emerald-600 border-emerald-200">
+                                <CheckCircle className="w-3 h-3" /> Kunci: {item.correct_answer}
+                              </span>
+                            )}
+                          </div>
+                          
+                          {item.image_url && <img src={item.image_url} alt="Media" className="h-16 rounded-lg border border-gray-200 mb-3 object-cover" />}
+                          
+                          <div 
+                            className="text-gray-800 mb-4 text-sm font-medium prose-sm"
+                            dangerouslySetInnerHTML={{ __html: renderMath(item.question_text) }}
+                          />
+                          
+                          {qType === 'pg' && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-xs text-gray-600">
+                              {Object.keys(item.options || {})
+                                .filter(key => key.length === 1 && key >= 'A' && key <= 'Z')
+                                .sort()
+                                .map((opt) => {
+                                  const val = item.options?.[opt];
+                                  const isCorrect = String(item.correct_answer || '').toUpperCase().includes(opt);
+                                  if (!val) return null;
+                                  return (
+                                    <div key={opt} className={`p-3.5 rounded-xl border-2 transition-all flex justify-between items-center ${isCorrect ? 'bg-emerald-50/50 border-emerald-200 text-emerald-950 font-bold' : 'bg-slate-50/50 border-slate-100'}`}>
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>{opt}</span>
+                                        <span className="truncate" dangerouslySetInnerHTML={{ __html: renderMath(val) }} />
+                                      </div>
+                                      {item.options?.points?.[opt] !== undefined && item.options.points[opt] !== 0 && (
+                                        <span className="text-[9px] text-indigo-600 font-black bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-lg shrink-0 ml-2">
+                                          +{item.options.points[opt]} Poin
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                            </div>
                           )}
-                          <span className="bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase px-2 py-0.5 rounded border border-indigo-100">
-                            {qType === 'pg' ? 'Pilihan Ganda' : qType === 'isian' ? 'Isian Singkat' : 'Essai Bebas'}
-                          </span>
-                          {/* Badge peringatan jika belum ada kunci jawaban */}
+
+                          {qType === 'isian' && (
+                            <div className="p-3 bg-indigo-50/30 border border-indigo-100 rounded-xl text-xs text-indigo-700 font-semibold max-w-md">
+                              Alternatif Kunci Jawaban: <span className="font-bold">{item.correct_answer || '—'}</span>
+                              <br/>
+                              Bobot Poin: <span className="font-bold">{item.options?.points?.correct ?? 4} Poin</span>
+                            </div>
+                          )}
+
+                          {qType === 'essay' && (
+                            <div className="p-3 bg-amber-50/30 border border-amber-100 rounded-xl text-xs text-amber-800 font-semibold max-w-md">
+                              Panduan Penilaian Juri: <span className="font-bold">{item.correct_answer || '—'}</span>
+                              <br/>
+                              Poin Maksimal: <span className="font-bold">{item.options?.points?.correct ?? item.weight ?? 10} Poin</span>
+                            </div>
+                          )}
+
                           {!isCorrectAnswerValid(item) && (
-                            <span className="flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded border bg-rose-50 text-rose-600 border-rose-200">
-                              <XCircle className="w-3 h-3" /> Belum Ada Kunci Jawaban
-                            </span>
-                          )}
-                          {/* Badge konfirmasi jika kunci jawaban sudah ada */}
-                          {isCorrectAnswerValid(item) && qType !== 'essay' && (
-                            <span className="flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded border bg-emerald-50 text-emerald-600 border-emerald-200">
-                              <CheckCircle className="w-3 h-3" /> Kunci: {item.correct_answer}
-                            </span>
+                            <div className="mt-3 flex flex-col gap-1.5 text-xs text-rose-600 font-semibold bg-rose-50 border border-rose-100 rounded-xl px-3 py-2.5">
+                              <div className="flex items-center gap-2">
+                                <XCircle className="w-4 h-4 shrink-0" />
+                                {/[^A-E]/i.test(item.correct_answer || '')
+                                  ? 'Data soal ini rusak akibat format CSV yang salah (koma dalam teks). Klik Edit untuk mengisi ulang.'
+                                  : 'Soal ini belum memiliki kunci jawaban yang valid. Klik Edit untuk menentukan jawaban yang benar.'
+                                }
+                              </div>
+                            </div>
                           )}
                         </div>
-                        
-                        {item.image_url && <img src={item.image_url} alt="Media" className="h-16 rounded-lg border border-gray-200 mb-3 object-cover" />}
-                        <div 
-                          className="text-gray-800 mb-4 text-sm font-medium prose-sm"
-                          dangerouslySetInnerHTML={{ __html: renderMath(item.question_text) }}
-                        />
-                        
-                        {qType === 'pg' && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-xs text-gray-600">
-                            {Object.keys(item.options || {})
-                              .filter(key => key.length === 1 && key >= 'A' && key <= 'Z')
-                              .sort()
-                              .map((opt) => {
-                                const val = item.options?.[opt];
-                                const isCorrect = String(item.correct_answer || '').toUpperCase().includes(opt);
-                                if (!val) return null;
-                                return (
-                                  <div key={opt} className={`p-3.5 rounded-xl border-2 transition-all flex justify-between items-center ${isCorrect ? 'bg-emerald-50/50 border-emerald-200 text-emerald-950 font-bold' : 'bg-slate-50/50 border-slate-100'}`}>
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>{opt}</span>
-                                      <span className="truncate" dangerouslySetInnerHTML={{ __html: renderMath(val) }} />
-                                    </div>
-                                    {item.options?.points?.[opt] !== undefined && item.options.points[opt] !== 0 && (
-                                      <span className="text-[9px] text-indigo-600 font-black bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-lg shrink-0 ml-2">
-                                        +{item.options.points[opt]} Poin
-                                      </span>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                          </div>
-                        )}
-
-                        {qType === 'isian' && (
-                          <div className="p-3 bg-indigo-50/30 border border-indigo-100 rounded-xl text-xs text-indigo-700 font-semibold max-w-md">
-                            Alternatif Kunci Jawaban: <span className="font-bold">{item.correct_answer || '—'}</span>
-                            <br/>
-                            Bobot Poin: <span className="font-bold">{item.options?.points?.correct ?? 4} Poin</span>
-                          </div>
-                        )}
-
-                        {qType === 'essay' && (
-                          <div className="p-3 bg-amber-50/30 border border-amber-100 rounded-xl text-xs text-amber-800 font-semibold max-w-md">
-                            Panduan Penilaian Juri: <span className="font-bold">{item.correct_answer || '—'}</span>
-                            <br/>
-                            Poin Maksimal: <span className="font-bold">{item.options?.points?.correct ?? item.weight ?? 10} Poin</span>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-
-                  {/* Peringatan inline jika tidak ada kunci jawaban */}
-                  {!isCorrectAnswerValid(item) && (
-                    <div className="mt-3 flex flex-col gap-1.5 text-xs text-rose-600 font-semibold bg-rose-50 border border-rose-100 rounded-xl px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <XCircle className="w-4 h-4 shrink-0" />
-                        {/[^A-E]/i.test(item.correct_answer || '')
-                          ? 'Data soal ini rusak akibat format CSV yang salah (koma dalam teks). Klik Edit — form akan dibersihkan otomatis, isi ulang opsi dan kunci jawaban.'
-                          : 'Soal ini belum memiliki kunci jawaban yang valid. Klik Edit untuk menentukan jawaban yang benar.'
-                        }
                       </div>
+
+                      {/* SISI TOMBOL KENDALI DATA */}
+                      <div className="flex md:flex-col space-x-2 md:space-x-0 md:space-y-2 mt-4 md:mt-0 w-full md:w-auto justify-end shrink-0">
+                        <button onClick={() => pemicuEditSoal(item)} className={`p-2.5 rounded-xl transition-colors flex items-center text-xs font-semibold ${
+                          !isCorrectAnswerValid(item)
+                            ? 'text-rose-500 bg-rose-50 hover:bg-rose-100 border border-rose-200'
+                            : 'text-gray-400 hover:text-amber-500 hover:bg-amber-50'
+                        }`}>
+                          <Pencil className="w-5 h-5 md:mr-0 mr-1.5" /> <span className="md:hidden">Edit</span>
+                        </button>
+                        <button onClick={() => handleHapusSoal(item.id)} className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors flex items-center text-xs font-semibold">
+                          <Trash2 className="w-5 h-5 md:mr-0 mr-1.5" /> <span className="md:hidden">Hapus</span>
+                        </button>
+                      </div>
+
                     </div>
-                  )}
-                </div>
-
-                {/* SISI TOMBOL KENDALI DATA */}
-                <div className="flex md:flex-col space-x-2 md:space-x-0 md:space-y-2 mt-4 md:mt-0 w-full md:w-auto justify-end">
-                  <button onClick={() => pemicuEditSoal(item)} className={`p-2.5 rounded-xl transition-colors flex items-center text-xs font-semibold ${
-                    !isCorrectAnswerValid(item)
-                      ? 'text-rose-500 bg-rose-50 hover:bg-rose-100 border border-rose-200'
-                      : 'text-gray-400 hover:text-amber-500 hover:bg-amber-50'
-                  }`}>
-                    <Pencil className="w-5 h-5 md:mr-0 mr-1.5" /> <span className="md:hidden">Edit</span>
-                  </button>
-                  <button onClick={() => handleHapusSoal(item.id)} className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors flex items-center text-xs font-semibold">
-                    <Trash2 className="w-5 h-5 md:mr-0 mr-1.5" /> <span className="md:hidden">Hapus</span>
-                  </button>
-                </div>
-
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          );
+        })()}
       </div>
+
+      {/* 🚀 FLOATING BATCH TOOLBAR: AKSI MASSAL KETIKA SOAL DIPILIH */}
+      {selectedQuestionIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-md text-white px-6 py-4 rounded-3xl shadow-2xl flex flex-col sm:flex-row items-center gap-4 border border-slate-700 animate-in slide-in-from-bottom-5">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center text-xs font-black">
+              {selectedQuestionIds.length}
+            </span>
+            <span className="text-xs font-bold text-slate-200">Soal Terpilih</span>
+          </div>
+
+          <div className="h-4 w-px bg-slate-700 hidden sm:block" />
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-slate-300 font-medium">Pindahkan ke Mapel:</span>
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  handleBatchSetSubject(e.target.value);
+                  e.target.value = '';
+                }
+              }}
+              disabled={isBatchUpdating}
+              className="bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-xl border border-slate-600 outline-none cursor-pointer hover:border-indigo-400"
+            >
+              <option value="" disabled>Pilih Mapel Tujuan...</option>
+              <option value="__CLEAR__">Umum (Hapus Mapel)</option>
+              {examSubjects.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={() => setSelectedQuestionIds([])}
+            className="text-xs text-slate-400 hover:text-white px-2 py-1 transition-colors"
+          >
+            Batal
+          </button>
+        </div>
+      )}
+
+      {/* 📚 MODAL KELOLA MATA PELAJARAN */}
+      {showManageSubjectModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md overflow-y-auto">
+          <div className="bg-white border border-slate-100 w-full max-w-lg rounded-[32px] p-6 sm:p-8 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 text-left">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-900 uppercase tracking-wider">Kelola Mata Pelajaran</h2>
+                  <p className="text-xs text-slate-400 font-semibold mt-0.5">Atur nama mapel & jumlah soal yang akan diacak</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowManageSubjectModal(false)}
+                className="p-2.5 hover:bg-slate-100 rounded-2xl text-slate-400 hover:text-slate-600 transition-all"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                {modalSubjectList.length === 0 ? (
+                  <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-center text-slate-400 text-xs font-semibold">
+                    Belum ada mata pelajaran. Klik tombol di bawah untuk menambahkan.
+                  </div>
+                ) : (
+                  modalSubjectList.map((mapel, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80">
+                      <input
+                        type="text"
+                        value={mapel.name}
+                        onChange={(e) => {
+                          const updated = [...modalSubjectList];
+                          updated[idx] = { ...updated[idx], name: e.target.value };
+                          setModalSubjectList(updated);
+                        }}
+                        placeholder="Nama mapel (cth: Matematika)"
+                        className="flex-1 bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none"
+                      />
+                      <div className="relative flex items-center">
+                        <input
+                          type="number"
+                          min={1}
+                          value={mapel.count || ''}
+                          onChange={(e) => {
+                            const updated = [...modalSubjectList];
+                            updated[idx] = { ...updated[idx], count: parseInt(e.target.value) || 0 };
+                            setModalSubjectList(updated);
+                          }}
+                          placeholder="0"
+                          className="w-20 bg-white border border-slate-200 focus:border-indigo-400 rounded-xl px-2.5 py-2 text-xs font-black text-slate-800 outline-none text-center pr-7"
+                        />
+                        <span className="absolute right-2 text-[8px] text-slate-400 font-bold pointer-events-none">soal</span>
+                      </div>
+                      <button
+                        onClick={() => setModalSubjectList(modalSubjectList.filter((_, i) => i !== idx))}
+                        className="w-8 h-8 flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-xl transition-colors shrink-0"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setModalSubjectList([...modalSubjectList, { name: '', count: 0 }])}
+                className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-purple-200 hover:border-purple-400 rounded-2xl text-xs font-black text-purple-600 hover:bg-purple-50/50 transition-all"
+              >
+                <Plus size={14} /> Tambah Mata Pelajaran Baru
+              </button>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                <span className="text-[11px] font-bold text-slate-500">
+                  Total Target: <b className="text-purple-600">{modalSubjectList.reduce((sum, m) => sum + (m.count || 0), 0)} soal</b>
+                </span>
+                <button
+                  type="button"
+                  disabled={isSavingSubjectConfig}
+                  onClick={() => {
+                    const valid = modalSubjectList.filter(m => m.name && m.name.trim() !== '');
+                    handleSaveSubjectConfig(valid);
+                  }}
+                  className="px-5 py-3 bg-purple-600 hover:bg-purple-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-lg shadow-purple-200 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                >
+                  {isSavingSubjectConfig ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Save size={14} />}
+                  Simpan Mapel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ================= MODAL TOAST POP-UP ================= */}
       <div className={`fixed bottom-8 right-8 z-[100] transition-all duration-500 transform ${toast.visible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'}`}>
