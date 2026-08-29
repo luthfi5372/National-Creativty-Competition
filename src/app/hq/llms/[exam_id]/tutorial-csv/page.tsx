@@ -32,10 +32,10 @@ export default function TutorialCSV() {
   const downloadTemplate = () => {
     // Template dengan kutip ganda agar aman untuk semua teks
     const lines = [
-      `"Soal","Opsi A","Opsi B","Opsi C","Opsi D","Opsi E","Kunci Jawaban","Tingkat Kesulitan","Tipe Soal"`,
-      `"Siapakah penemu bola lampu?","Thomas Edison","Isaac Newton","Albert Einstein","Nikola Tesla","James Watt","A","MUDAH","pg"`,
-      `"Apakah ibukota dari negara Indonesia?","","","","","","Jakarta|DKI Jakarta","MUDAH","isian"`,
-      `"Jelaskan bagaimana proses terjadinya siklus hujan secara singkat!","","","","","","Kunci: evaporasi, kondensasi, presipitasi","SEDANG","essay"`,
+      `"Soal","Opsi A","Opsi B","Opsi C","Opsi D","Opsi E","Kunci Jawaban","Tingkat Kesulitan","Tipe Soal","Mata Pelajaran"`,
+      `"Siapakah penemu bola lampu?","Thomas Edison","Isaac Newton","Albert Einstein","Nikola Tesla","James Watt","A","MUDAH","pg","Fisika"`,
+      `"Berapa hasil dari 25 x 4?","","","","","","100","MUDAH","isian","Matematika"`,
+      `"Jelaskan bagaimana proses terjadinya siklus hujan secara singkat!","","","","","","Kunci: evaporasi, kondensasi, presipitasi","SEDANG","essay","Biologi"`,
     ];
     const csvContent = "data:text/csv;charset=utf-8," + lines.join('\n');
     const link = document.createElement("a");
@@ -46,9 +46,9 @@ export default function TutorialCSV() {
     document.body.removeChild(link);
   };
 
-  const correctExample = `"Soal","Opsi A","Opsi B","Opsi C","Opsi D","Opsi E","Kunci Jawaban","Tingkat Kesulitan","Tipe Soal"
-"Jika x > y dan y > z, manakah yang pasti benar?","x < z","x = z","x > z","x + y = z","Tidak dapat ditentukan","C","SEDANG","pg"
-"Apakah ibukota Indonesia?","","","","","","Jakarta|DKI Jakarta","MUDAH","isian"`;
+  const correctExample = `"Soal","Opsi A","Opsi B","Opsi C","Opsi D","Opsi E","Kunci Jawaban","Tingkat Kesulitan","Tipe Soal","Mata Pelajaran"
+"Jika x > y dan y > z, manakah yang pasti benar?","x < z","x = z","x > z","x + y = z","Tidak dapat ditentukan","C","SEDANG","pg","Matematika"
+"Apakah ibukota Indonesia?","","","","","","Jakarta|DKI Jakarta","MUDAH","isian","Umum"`;
 
   const wrongExample1 = `Soal,Opsi A,Opsi B,Opsi C,Opsi D,Opsi E,Kunci Jawaban,Tingkat Kesulitan,Tipe Soal
 Jika x > y dan y > z, manakah yang pasti benar?,x < z,x = z,x > z,x + y = z,Tidak dapat ditentukan,C,SEDANG,pg`;

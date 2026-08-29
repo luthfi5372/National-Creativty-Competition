@@ -596,7 +596,11 @@ export default function IntegratedLLMSDashboard() {
             </div>
             <span className="text-slate-300 text-[10px] font-bold">·</span>
             <span className="text-[10px] text-indigo-650 bg-indigo-50/50 border border-indigo-100/30 px-1.5 py-0.5 rounded-md font-bold">
-              {session.question_count || 0} Soal
+              {Array.isArray(session.subject_config) && session.subject_config.length > 0
+                ? `${session.subject_config.reduce((s: number, m: any) => s + (m.count || 0), 0)} / ${session.total_questions || 0} Soal (${session.subject_config.length} Mapel)`
+                : session.question_count
+                  ? `${session.question_count} / ${session.total_questions || 0} Soal`
+                  : `${session.total_questions ?? session.question_count ?? 0} Soal`}
             </span>
           </div>
         </div>

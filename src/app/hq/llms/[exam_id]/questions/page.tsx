@@ -297,6 +297,7 @@ export default function EditorBankSoal() {
   // ✏️ 4. MASUK KE MODE EDIT (NAIKKAN DATA KE FORM)
   const pemicuEditSoal = (item: any) => {
     setEditingId(item.id);
+    setSelectedSubject(item.subject || '');
     
     const qType = item.options?.type || 'pg';
     setQuestionType(qType);
@@ -437,6 +438,7 @@ export default function EditorBankSoal() {
           const rawDifficulty = (kolom[7] || '').trim();
           const rawType       = (kolom[8] || '').trim().toLowerCase();
           const type          = ['pg', 'isian', 'essay'].includes(rawType) ? rawType : 'pg';
+          const rawSubject    = (kolom[9] || '').trim();
 
           // Validasi Kunci Jawaban
           let validKunci = '';
@@ -511,6 +513,7 @@ export default function EditorBankSoal() {
             correct_answer: validKunci,
             difficulty,
             weight: calculatedWeight,
+            subject: rawSubject || null,
             status: 'Published',
             created_at: qCreatedAt.toISOString()
           });

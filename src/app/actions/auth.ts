@@ -702,10 +702,11 @@ export async function getLLMSTelemetryData() {
       console.warn("[LLMS Telemetry] cbt_exams query failed:", eError.message);
     }
 
-    // Petakan properti question_count ke masing-masing ujian
+    // Petakan properti total_questions (jumlah di bank) dan pertahankan question_count (target tampil)
     const examsWithCounts = (examsData || []).map((exam: any) => ({
       ...exam,
-      question_count: questionCounts[exam.id] || 0
+      total_questions: questionCounts[exam.id] || 0,
+      question_count: exam.question_count ?? null
     }));
 
     // Ambil data cbt_attempts
@@ -1591,7 +1592,7 @@ export async function getExamDataServer(examId: string) {
     const [examRes, qRes] = await Promise.all([
       client
         .from('cbt_exams')
-        .select('id, title, token, duration_minutes, is_active, correct_point, penalty_point, empty_point, scoring_system, shuffle_questions')
+        .select('*')
         .eq('id', examId)
         .maybeSingle(),
       client
