@@ -105,6 +105,9 @@ export default function EditorBankSoal() {
     }
   };
   
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
+  const [examSubjects, setExamSubjects] = useState<string[]>([]);
+
   // State Mode Edit & Gambar
   const [editingId, setEditingId] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -123,16 +126,27 @@ export default function EditorBankSoal() {
 
   // 📡 1. TARIK DATA DARI DATABASE
   const fetchSoalTersimpan = async () => {
-    const { data } = await supabase
-      .from('cbt_questions')
-      .select('*')
-      .eq('exam_id', examId)
-      .order('created_at', { ascending: false });
-      
+    const [{ data }, { data: examData }] = await Promise.all([
+      supabase
+        .from('cbt_questions')
+        .select('*')
+        .eq('exam_id', examId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('cbt_exams')
+        .select('subject_config')
+        .eq('id', examId)
+        .maybeSingle()
+    ]);
     if (data) {
-      // Double lock: Filter di sisi klien untuk memastikan tidak ada data sesi lain yang bocor
-      const strictlyFiltered = data.filter(q => q.exam_id === examId);
+      const strictlyFiltered = data.filter((q: any) => q.exam_id === examId);
       setDaftarSoal(strictlyFiltered);
+    }
+    if (examData?.subject_config && Array.isArray(examData.subject_config)) {
+      const subjects = (examData.subject_config as any[])
+        .map((s: any) => String(s.name || ''))
+        .filter((n: string) => n.trim() !== '');
+      setExamSubjects(subjects);
     }
   };
 
@@ -245,6 +259,7 @@ export default function EditorBankSoal() {
         correct_answer: finalCorrectAnswer,
         difficulty: difficulty,
         weight: calculatedWeight,
+        subject: selectedSubject.trim() || null,
         status: 'Published'
       };
 
@@ -538,6 +553,7 @@ export default function EditorBankSoal() {
 
   const resetForm = () => {
     setSoal('');
+    setSelectedSubject('');
     setOpsi({ A: '', B: '', C: '', D: '', E: '' });
     setKunciJawaban('A');
     setVisibleOptions(['A', 'B', 'C', 'D', 'E']);
@@ -803,6 +819,19 @@ export default function EditorBankSoal() {
             )}
           </div>
 
+          {examSubjects.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase text-slate-500 tracking-widest">Mata Pelajaran</label>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setSelectedSubject('')} className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2 ${selectedSubject === '' ? 'bg-slate-700 text-white border-slate-700' : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-slate-400'}`}>Umum</button>
+                {examSubjects.map(subj => (
+                  <button key={subj} type="button" onClick={() => setSelectedSubject(selectedSubject === subj ? '' : subj)} className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2 ${selectedSubject === subj ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-indigo-300'}`}>{subj}</button>
+                ))}
+              </div>
+              {selectedSubject && <p className="text-[9px] text-indigo-500 font-bold">📌 Soal ini masuk mapel: {selectedSubject}</p>}
+            </div>
+          )}
+
           {/* AKSI TOMBOL UTAMA */}
           <div className="flex space-x-3 mt-8">
             {editingId && (
@@ -983,6 +1012,11 @@ export default function EditorBankSoal() {
                               'bg-amber-50 text-amber-600 border-amber-100'}`}>
                             {item.difficulty || 'Medium'}
                           </span>
+                          {item.subject && (
+                            <span className="px-2 py-0.5 rounded-lg text-[9px] font-black bg-indigo-100 text-indigo-600 border border-indigo-200">
+                              {item.subject}
+                            </span>
+                          )}
                           <span className="bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase px-2 py-0.5 rounded border border-indigo-100">
                             {qType === 'pg' ? 'Pilihan Ganda' : qType === 'isian' ? 'Isian Singkat' : 'Essai Bebas'}
                           </span>

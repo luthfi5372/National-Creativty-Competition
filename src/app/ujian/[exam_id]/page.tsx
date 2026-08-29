@@ -111,15 +111,33 @@ export default function ExamRoom() {
           scoring_system: examData.scoring_system || 'Fixed',
         });
 
-        // 2. Set soal (sudah diambil bersamaan di Server Action)
+        // 2. Set soal: smart shuffle — per-mapel atau global question_count
         if (qData && qData.length > 0) {
           const shouldShuffle = examData?.shuffle_questions !== false;
-          if (shouldShuffle) {
-            const shuffled = [...qData].sort(() => Math.random() - 0.5);
-            setQuestions(shuffled);
+          const subjectConfig: {name: string; count: number}[] = Array.isArray(examData?.subject_config) ? examData.subject_config : [];
+          const questionCount: number | null = examData?.question_count ?? null;
+          const fyShuffle = (arr: any[]) => {
+            const a = [...arr];
+            for (let i = a.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+          };
+          let finalQuestions: any[];
+          if (subjectConfig.length > 0) {
+            const picked: any[] = [];
+            subjectConfig.forEach(({ name, count }) => {
+              const pool = qData.filter((q: any) => (q.subject || '').toLowerCase() === name.toLowerCase());
+              picked.push(...fyShuffle(pool).slice(0, count));
+            });
+            finalQuestions = shouldShuffle ? fyShuffle(picked) : picked;
+          } else if (questionCount && questionCount > 0 && questionCount < qData.length) {
+            finalQuestions = fyShuffle(qData).slice(0, questionCount);
           } else {
-            setQuestions(qData);
+            finalQuestions = shouldShuffle ? fyShuffle(qData) : qData;
           }
+          setQuestions(finalQuestions);
         }
 
         // 3. Lapor kehadiran CCTV & Inisialisasi Sesi (Bypass RLS)

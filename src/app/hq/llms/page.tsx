@@ -55,6 +55,8 @@ export default function IntegratedLLMSDashboard() {
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
   const [entryCount, setEntryCount] = useState<number | null>(null);
   const [showShufflePopup, setShowShufflePopup] = useState(false);
+  const [editSubjectConfig, setEditSubjectConfig] = useState<{name: string; count: number}[]>([]);
+  const [newSubjectConfig, setNewSubjectConfig] = useState<{name: string; count: number}[]>([]);
 
   // 🛡️ Security Log Full Preview Modal & Scroll States
   const [selectedSecurityLog, setSelectedSecurityLog] = useState<any | null>(null);
@@ -160,6 +162,8 @@ export default function IntegratedLLMSDashboard() {
 
   const openEditModal = (session: any) => {
     setEditingSession({ ...session });
+    const subConf = Array.isArray(session.subject_config) ? session.subject_config : [];
+    setEditSubjectConfig(subConf);
     setShowEditModal(true);
   };
 
@@ -171,6 +175,7 @@ export default function IntegratedLLMSDashboard() {
   const handleUpdateSession = async () => {
     if (!editingSession) return;
     setIsSavingEdit(true);
+    const hasMapel = editSubjectConfig.length > 0;
     const { error } = await supabase.from('cbt_exams').update({
       title: editingSession.title,
       token: editingSession.token ? editingSession.token.trim().toUpperCase() : null,
@@ -182,6 +187,8 @@ export default function IntegratedLLMSDashboard() {
       penalty_point: Number(editingSession.penalty_point) || 0,
       empty_point: Number(editingSession.empty_point) || 0,
       description: editingSession.description || '',
+      question_count: hasMapel ? null : (Number(editingSession.question_count) || null),
+      subject_config: editSubjectConfig,
     }).eq('id', editingSession.id);
     if (!error) {
       setShowEditModal(false);
@@ -462,6 +469,7 @@ export default function IntegratedLLMSDashboard() {
       : Math.random().toString(36).substring(2, 8).toUpperCase();
     setIsSaving(true);
     try {
+      const hasMapelNew = newSubjectConfig.length > 0;
       const { error } = await supabase.from('cbt_exams').insert([{
         title: newSession.title.trim(),
         token: finalToken,
@@ -473,10 +481,13 @@ export default function IntegratedLLMSDashboard() {
         is_active: (newSession as any).is_active ?? false,
         shuffle_questions: newSession.shuffle_questions ?? true,
         description: newSession.description || '',
+        question_count: hasMapelNew ? null : (Number((newSession as any).question_count) || null),
+        subject_config: newSubjectConfig,
       }]);
       if (error) throw error;
       setShowAddModal(false);
       setNewSession({ title: '', token: '', duration_minutes: 90, scoring_system: 'Custom', correct_point: 0, penalty_point: 0, empty_point: 0, is_active: false, shuffle_questions: true, description: '' });
+      setNewSubjectConfig([]);
       fetchTelemetryData();
       showToast((newSession as any).is_active ? 'Sesi ujian baru langsung aktif!' : 'Sesi ujian baru berhasil dibuat!', 'success');
     } catch (err: any) {
@@ -1178,6 +1189,53 @@ export default function IntegratedLLMSDashboard() {
                 </p>
               </div>
 
+              {/* ─── PENGATURAN SOAL ─── */}
+              <div className="p-5 bg-indigo-50/60 border border-indigo-100/60 rounded-3xl space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 bg-white rounded-xl border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                    <FileText size={14} className="stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-wider text-slate-800">Pengaturan Soal</p>
+                    <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Atur jumlah soal yang ditampilkan ke peserta</p>
+                  </div>
+                </div>
+                {editSubjectConfig.length === 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Soal Ditampilkan ke Peserta</label>
+                    <div className="relative flex items-center bg-white border border-slate-200 rounded-2xl overflow-hidden focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50 transition-all">
+                      <input type="number" min={1} value={editingSession.question_count || ''} onChange={e => setEditingSession({...editingSession, question_count: e.target.value ? parseInt(e.target.value) : null})} placeholder="Kosong = tampilkan semua soal" className="w-full bg-transparent px-4 py-3 text-sm font-semibold text-slate-800 outline-none placeholder-slate-300" />
+                      <span className="absolute right-4 text-[9px] font-black text-slate-400">soal</span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 font-bold px-1">💡 Simpan 200 soal di bank, tapi peserta hanya kerjakan 40 soal acak.</p>
+                  </div>
+                )}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Mata Pelajaran (Opsional)</label>
+                    {editSubjectConfig.length > 0 && <span className="text-[8px] font-black bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">Total: {editSubjectConfig.reduce((s, m) => s + (m.count || 0), 0)} soal</span>}
+                  </div>
+                  {editSubjectConfig.length > 0 && (
+                    <div className="space-y-2">
+                      {editSubjectConfig.map((mapel, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input type="text" value={mapel.name} onChange={e => { const n=[...editSubjectConfig]; n[idx]={...n[idx],name:e.target.value}; setEditSubjectConfig(n); }} placeholder="Nama mapel" className="flex-1 bg-white border border-slate-200 focus:border-indigo-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 outline-none" />
+                          <div className="relative flex items-center">
+                            <input type="number" min={1} value={mapel.count||''} onChange={e => { const n=[...editSubjectConfig]; n[idx]={...n[idx],count:parseInt(e.target.value)||0}; setEditSubjectConfig(n); }} placeholder="0" className="w-20 bg-white border border-slate-200 focus:border-indigo-300 rounded-xl px-3 py-2.5 text-xs font-black text-slate-800 outline-none text-center pr-7" />
+                            <span className="absolute right-2 text-[8px] text-slate-400 font-bold pointer-events-none">soal</span>
+                          </div>
+                          <button onClick={() => setEditSubjectConfig(editSubjectConfig.filter((_,i)=>i!==idx))} className="w-8 h-8 flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-400 rounded-xl transition-all"><Trash2 size={12}/></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button onClick={() => setEditSubjectConfig([...editSubjectConfig,{name:'',count:0}])} className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-xl text-[10px] font-black text-indigo-400 hover:text-indigo-600 transition-all">
+                    <Plus size={12}/> Tambah Mata Pelajaran
+                  </button>
+                  {editSubjectConfig.length > 0 && <p className="text-[9px] text-indigo-500 font-bold px-1">📚 Mode mapel aktif. Soal diambil acak sesuai jumlah per mapel.</p>}
+                </div>
+              </div>
+
               {/* SISTEM PENILAIAN CBT */}
               <div className="p-5 bg-slate-50 border border-slate-200/60 rounded-3xl space-y-5">
                 <div className="flex items-center justify-between">
@@ -1498,6 +1556,53 @@ export default function IntegratedLLMSDashboard() {
                     ? '🔀 Tiap peserta mendapat urutan soal yang berbeda secara acak.'
                     : '📋 Semua peserta mendapat soal dengan urutan yang sama persis.'}
                 </p>
+              </div>
+
+              {/* ─── PENGATURAN SOAL (ADD) ─── */}
+              <div className="p-5 bg-indigo-50/60 border border-indigo-100/60 rounded-3xl space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 bg-white rounded-xl border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                    <FileText size={14} className="stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-wider text-slate-800">Pengaturan Soal</p>
+                    <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Atur jumlah soal yang ditampilkan ke peserta</p>
+                  </div>
+                </div>
+                {newSubjectConfig.length === 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Soal Ditampilkan ke Peserta</label>
+                    <div className="relative flex items-center bg-white border border-slate-200 rounded-2xl overflow-hidden focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50 transition-all">
+                      <input type="number" min={1} value={(newSession as any).question_count || ''} onChange={e => setNewSession({...newSession, question_count: e.target.value ? parseInt(e.target.value) : null} as any)} placeholder="Kosong = tampilkan semua soal" className="w-full bg-transparent px-4 py-3 text-sm font-semibold text-slate-800 outline-none placeholder-slate-300" />
+                      <span className="absolute right-4 text-[9px] font-black text-slate-400">soal</span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 font-bold px-1">💡 Simpan 200 soal di bank, tapi peserta hanya kerjakan 40 soal acak.</p>
+                  </div>
+                )}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Mata Pelajaran (Opsional)</label>
+                    {newSubjectConfig.length > 0 && <span className="text-[8px] font-black bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">Total: {newSubjectConfig.reduce((s,m)=>s+(m.count||0),0)} soal</span>}
+                  </div>
+                  {newSubjectConfig.length > 0 && (
+                    <div className="space-y-2">
+                      {newSubjectConfig.map((mapel, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input type="text" value={mapel.name} onChange={e => { const n=[...newSubjectConfig]; n[idx]={...n[idx],name:e.target.value}; setNewSubjectConfig(n); }} placeholder="Nama mapel" className="flex-1 bg-white border border-slate-200 focus:border-indigo-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 outline-none" />
+                          <div className="relative flex items-center">
+                            <input type="number" min={1} value={mapel.count||''} onChange={e => { const n=[...newSubjectConfig]; n[idx]={...n[idx],count:parseInt(e.target.value)||0}; setNewSubjectConfig(n); }} placeholder="0" className="w-20 bg-white border border-slate-200 focus:border-indigo-300 rounded-xl px-3 py-2.5 text-xs font-black text-slate-800 outline-none text-center pr-7" />
+                            <span className="absolute right-2 text-[8px] text-slate-400 font-bold pointer-events-none">soal</span>
+                          </div>
+                          <button onClick={() => setNewSubjectConfig(newSubjectConfig.filter((_,i)=>i!==idx))} className="w-8 h-8 flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-400 rounded-xl transition-all"><Trash2 size={12}/></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button onClick={() => setNewSubjectConfig([...newSubjectConfig,{name:'',count:0}])} className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-xl text-[10px] font-black text-indigo-400 hover:text-indigo-600 transition-all">
+                    <Plus size={12}/> Tambah Mata Pelajaran
+                  </button>
+                  {newSubjectConfig.length > 0 && <p className="text-[9px] text-indigo-500 font-bold px-1">📚 Mode mapel aktif. Soal diambil acak sesuai jumlah per mapel.</p>}
+                </div>
               </div>
 
               {/* Deskripsi Ujian */}
