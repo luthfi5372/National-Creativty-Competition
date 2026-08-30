@@ -514,10 +514,14 @@ export default function EditorBankSoal() {
             if (opsiC) optionsObj.C = opsiC;
             if (opsiD) optionsObj.D = opsiD;
             if (opsiE) optionsObj.E = opsiE;
-            optionsObj.points = { A: 4, B: 0, C: 0, D: 0, E: 0 };
-            // Assign default points
-            const pts = Object.values(optionsObj.points).map(Number);
-            calculatedWeight = pts.length > 0 ? Math.max(0, ...pts) : 4;
+
+            const pointsMap: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+            const correctKeys = validKunci.split('');
+            correctKeys.forEach(k => {
+              pointsMap[k] = 4;
+            });
+            optionsObj.points = pointsMap;
+            calculatedWeight = 4;
           } else if (type === 'isian') {
             optionsObj.points = { correct: 4 };
             calculatedWeight = 4;
@@ -566,6 +570,82 @@ export default function EditorBankSoal() {
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleDownloadCSVTemplate = () => {
+    const headers = [
+      '"Soal"',
+      '"Pilihan A"',
+      '"Pilihan B"',
+      '"Pilihan C"',
+      '"Pilihan D"',
+      '"Pilihan E"',
+      '"Kunci Jawaban"',
+      '"Tingkat Kesulitan"',
+      '"Tipe Soal"',
+      '"Mata Pelajaran"'
+    ];
+
+    const sampleRows = [
+      [
+        '"Lambang kimia dari unsur Emas adalah..."',
+        '"Au"',
+        '"Ag"',
+        '"Fe"',
+        '"Cu"',
+        '"Al"',
+        '"A"',
+        '"Easy"',
+        '"pg"',
+        '"Kimia"'
+      ],
+      [
+        '"Berapakah hasil dari 15 x 12?"',
+        '"150"',
+        '"180"',
+        '"200"',
+        '"160"',
+        '"175"',
+        '"B"',
+        '"Easy"',
+        '"pg"',
+        '"Matematika"'
+      ],
+      [
+        '"Sebutkan ibukota dari negara Indonesia saat ini!"',
+        '""',
+        '""',
+        '""',
+        '""',
+        '""',
+        '"Jakarta | IKN"',
+        '"Easy"',
+        '"isian"',
+        '"Umum"'
+      ],
+      [
+        '"Jelaskan proses terjadinya fotosintesis pada tumbuhan secara singkat!"',
+        '""',
+        '""',
+        '""',
+        '""',
+        '""',
+        '"Panduan: Sebutkan klorofil, cahaya matahari, CO2, dan H2O"',
+        '"Medium"',
+        '"essay"',
+        '"Biologi"'
+      ]
+    ];
+
+    const csvContent = "\uFEFF" + [headers.join(','), ...sampleRows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Template_Bank_Soal_CBT_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast("Template CSV Soal berhasil diunduh!", "success");
   };
 
   const handleHapusSoal = async (id: string) => {
@@ -681,6 +761,14 @@ export default function EditorBankSoal() {
           >
             <Layers className="w-4 h-4 mr-2 text-purple-600" />
             Kelola Mapel ({examSubjects.length})
+          </button>
+
+          <button
+            onClick={handleDownloadCSVTemplate}
+            className="flex items-center px-4 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold tracking-wide transition-all shadow-sm active:scale-95"
+          >
+            <Download className="w-4 h-4 mr-2 text-emerald-600" />
+            Template CSV
           </button>
 
           <Link 

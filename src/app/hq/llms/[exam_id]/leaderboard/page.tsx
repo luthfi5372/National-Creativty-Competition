@@ -538,7 +538,51 @@ export default function LiveLeaderboard() {
   });
 
   const downloadCSV = () => {
-    downloadDetailCSV();
+    if (attempts.length === 0) {
+      showToast("Belum ada data pengerjaan untuk diekspor.", "error");
+      return;
+    }
+    const headers = [
+      '"Peringkat"',
+      '"ID Peserta / Tiket"',
+      '"Nama Peserta"',
+      '"Asal Sekolah"',
+      '"Bidang Lomba"',
+      '"Skor Akhir"',
+      '"Jumlah Pelanggaran"',
+      '"Status Ujian"',
+      '"Waktu Submit"'
+    ];
+
+    const rows = filteredAttempts.map((item) => {
+      const realRank = attempts.findIndex(a => a.id === item.id) + 1;
+      const info = resolveParticipantInfo(item.user_id);
+      const score = item.final_score ?? item.current_score ?? 0;
+      const submitTime = item.submitted_at ? new Date(item.submitted_at).toLocaleString('id-ID') : '-';
+      const status = item.status === 'submitted' ? 'Selesai' : 'Sedang Mengerjakan';
+
+      return [
+        `"${realRank}"`,
+        `"${String(item.user_id || '').replace(/"/g, '""')}"`,
+        `"${String(info.full_name || 'Peserta NCC').replace(/"/g, '""')}"`,
+        `"${String(info.school_name || info.school_origin || '-').replace(/"/g, '""')}"`,
+        `"${String(info.competition_type || info.category || 'Olimpiade MIPA').replace(/"/g, '""')}"`,
+        `"${score}"`,
+        `"${item.violations_count || 0}"`,
+        `"${status}"`,
+        `"${submitTime}"`
+      ].join(',');
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Rekap_Skor_${examConfig?.title ? examConfig.title.replace(/[^a-zA-Z0-9]/g, '_') : 'CBT'}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast("File Rekap Skor CSV berhasil diunduh!", "success");
   };
 
   // Export detail: per question answer correctness
