@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Pencil,
   Upload,
+  Download,
   XCircle,
   Loader2,
   BookOpen,
