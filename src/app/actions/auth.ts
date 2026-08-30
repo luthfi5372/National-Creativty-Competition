@@ -265,78 +265,108 @@ export async function loginLocalUser(formData: FormData): Promise<AuthResult> {
     let authError = signInResult.error;
 
     if (authError) {
-      // 🚨 FALLBACK: Check if this user exists in competition_entries and has verified status
-      // where email = email and password (entered as password) matches their NISN
-      const { data: entries, error: dbError } = await supabase
-        .from('competition_entries')
-        .select('*')
-        .eq('email', email)
-        .eq('nisn', password); // Password is their NISN!
-
-      if (!dbError && entries && entries.length > 0) {
-        const entry = entries[0];
-        
-        // If they already have a user_id linked in the database, they already have a Supabase Auth account.
-        // If signInWithPassword failed, they entered a wrong password, so we do not re-register them.
-        if (entry.user_id) {
-          throw new Error("Email atau kata sandi salah. Jika Anda sudah mengaktifkan akun / membuat kata sandi kustom sebelumnya, silakan gunakan kata sandi kustom Anda (bukan NISN).");
-        }
-
-        console.log(`[Auth Fallback] Found matching verified participant for ${email}. Auto-registering...`);
-        
-        // Register the participant on-the-fly in Supabase Auth
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password, // NISN becomes their password
-          options: {
-            data: {
-              full_name: entry.full_name,
-              username: email.split('@')[0],
-              custom_password: password, // NISN becomes custom password!
-            }
-          }
+      // 🚨 FALLBACK: Cek apakah user ada di competition_entries dengan password dari custom_password atau NISN
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      
+      let entry = null;
+      if (serviceRoleKey) {
+        const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+        const serviceClient = createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
         });
 
-        if (!signUpError && signUpData.user) {
-          // Sync profile to profiles table
-          await supabase
-            .from('profiles')
-            .insert({
-              id: signUpData.user.id,
-              username: email.split('@')[0],
-              full_name: entry.full_name,
-            });
+        const { data: entries } = await serviceClient
+          .from('competition_entries')
+          .select('*')
+          .eq('email', email);
 
-          // Link competition_entries user_id with the new Supabase Auth user ID
-          await supabase
-            .from('competition_entries')
-            .update({ user_id: signUpData.user.id })
-            .eq('id', entry.id);
-
-          // Retry login
-          const retryResult = await supabase.auth.signInWithPassword({
-            email,
-            password
+        if (entries && entries.length > 0) {
+          const matchedEntry = entries.find(e => {
+            let customPw = null;
+            if (e.notes) {
+              try {
+                const obj = typeof e.notes === 'string' ? JSON.parse(e.notes) : e.notes;
+                customPw = obj?.custom_password || obj?.password;
+              } catch (_) {}
+            }
+            return (customPw && String(customPw).trim() === password.trim()) || 
+                   (e.nisn && String(e.nisn).trim() === password.trim());
           });
 
-          if (!retryResult.error) {
-            authData = retryResult.data;
-            authError = null;
-          } else {
-            throw retryResult.error;
-          }
-        } else {
-          const isAlreadyRegistered = 
-            signUpError?.message?.toLowerCase().includes("already registered") || 
-            signUpError?.message?.toLowerCase().includes("already exists") ||
-            signUpError?.status === 422;
+          if (matchedEntry) {
+            entry = matchedEntry;
+            console.log(`[Auth Self-Healing] Found matching participant credentials for ${email}. Auto-healing in Supabase Auth...`);
 
-          if (isAlreadyRegistered) {
-            throw new Error("Email ini sudah terdaftar dengan kata sandi kustom. Silakan masuk menggunakan kata sandi yang Anda buat saat pendaftaran pertama kali di portal ini (bukan NISN Anda), atau gunakan fitur Lupa Sandi.");
+            // Pastikan user ada di auth.users dengan password terbaru
+            try {
+              const { data: listData } = await serviceClient.auth.admin.listUsers();
+              const existingUser = listData?.users?.find(u => u.email?.toLowerCase() === email);
+
+              let finalUid = existingUser?.id;
+              if (existingUser) {
+                await serviceClient.auth.admin.updateUserById(existingUser.id, {
+                  password: password.trim(),
+                  email_confirm: true,
+                  user_metadata: {
+                    full_name: entry.full_name,
+                    username: email.split('@')[0],
+                    nisn: entry.nisn || '',
+                    custom_password: password.trim()
+                  }
+                });
+              } else {
+                const { data: newUser } = await serviceClient.auth.admin.createUser({
+                  email: email,
+                  password: password.trim(),
+                  email_confirm: true,
+                  user_metadata: {
+                    full_name: entry.full_name,
+                    username: email.split('@')[0],
+                    nisn: entry.nisn || '',
+                    custom_password: password.trim()
+                  }
+                });
+                finalUid = newUser?.user?.id;
+              }
+
+              if (finalUid) {
+                await serviceClient
+                  .from('competition_entries')
+                  .update({ user_id: finalUid })
+                  .eq('id', entry.id);
+
+                await serviceClient
+                  .from('profiles')
+                  .upsert({
+                    id: finalUid,
+                    email: email,
+                    full_name: entry.full_name,
+                    school_name: entry.school_name || '',
+                    nisn: entry.nisn || '',
+                    phone: entry.whatsapp || entry.phone || '',
+                    updated_at: new Date().toISOString()
+                  });
+              }
+
+              // Coba login ulang setelah self-healing
+              const retryResult = await supabase.auth.signInWithPassword({
+                email,
+                password: password.trim()
+              });
+
+              if (!retryResult.error) {
+                authData = retryResult.data;
+                authError = null;
+              }
+            } catch (healErr) {
+              console.error("[Auth Self-Healing] Exception:", healErr);
+            }
           }
-          throw signUpError || new Error("Failed to register participant on-the-fly.");
         }
-      } else {
+      }
+
+      if (authError) {
         throw authError; // Throw original login error
       }
     }
