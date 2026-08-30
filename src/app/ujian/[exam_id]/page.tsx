@@ -13,6 +13,21 @@ import {
   ShieldExclamationIcon,
   LockClosedIcon
 } from '@heroicons/react/24/outline';
+import katex from "katex";
+import "katex/dist/katex.min.css";
+
+// --- ⚡ MIPA MATH RENDERER ENGINE ---
+const renderMath = (text: string) => {
+  if (!text) return "";
+  let html = text;
+  html = html.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
+    try { return katex.renderToString(formula, { displayMode: true, throwOnError: false }); } catch (e) { return match; }
+  });
+  html = html.replace(/\$(.*?)\$/g, (match, formula) => {
+    try { return katex.renderToString(formula, { displayMode: false, throwOnError: false }); } catch (e) { return match; }
+  });
+  return html;
+};
 
 export default function ExamRoom() {
   // 🔥 SOLUSI UTAMA: Mengambil parameter URL dengan aman menggunakan useParams
@@ -111,11 +126,16 @@ export default function ExamRoom() {
           scoring_system: examData.scoring_system || 'Fixed',
         });
 
-        // 2. Set soal: smart shuffle — per-mapel atau global question_count
+        // 2. Identitas Peserta Ujian
+        const userId = parsedUser.ticket_code || (parsedUser.id ? `NCC-${generateTicketCode(parsedUser.id)}` : (parsedUser.nisn || parsedUser.username));
+        console.log(`[CBT INIT] userId=${userId} | examId=${examId}`);
+
+        // 3. Set soal: smart shuffle — per-mapel atau global question_count (dengan proteksi reload konsisten)
         if (qData && qData.length > 0) {
           const shouldShuffle = examData?.shuffle_questions !== false;
           const subjectConfig: {name: string; count: number}[] = Array.isArray(examData?.subject_config) ? examData.subject_config : [];
           const questionCount: number | null = examData?.question_count ?? null;
+          
           const fyShuffle = (arr: any[]) => {
             const a = [...arr];
             for (let i = a.length - 1; i > 0; i--) {
@@ -124,27 +144,50 @@ export default function ExamRoom() {
             }
             return a;
           };
-          let finalQuestions: any[];
-          if (subjectConfig.length > 0) {
-            const picked: any[] = [];
-            subjectConfig.forEach(({ name, count }) => {
-              const pool = qData.filter((q: any) => (q.subject || '').toLowerCase() === name.toLowerCase());
-              picked.push(...fyShuffle(pool).slice(0, count));
-            });
-            finalQuestions = shouldShuffle ? fyShuffle(picked) : picked;
-          } else if (questionCount && questionCount > 0 && questionCount < qData.length) {
-            finalQuestions = fyShuffle(qData).slice(0, questionCount);
-          } else {
-            finalQuestions = shouldShuffle ? fyShuffle(qData) : qData;
+
+          const cacheKey = `cbt_q_ids_${examId}_${userId}`;
+          let cachedIds: string[] | null = null;
+          try {
+            const raw = localStorage.getItem(cacheKey);
+            if (raw) cachedIds = JSON.parse(raw);
+          } catch (e) {}
+
+          let finalQuestions: any[] = [];
+
+          if (cachedIds && Array.isArray(cachedIds) && cachedIds.length > 0) {
+            const qMap = new Map(qData.map((q: any) => [q.id, q]));
+            const restored = cachedIds.map((id: string) => qMap.get(id)).filter(Boolean);
+            if (restored.length > 0) {
+              finalQuestions = restored;
+            }
           }
+
+          if (finalQuestions.length === 0) {
+            if (subjectConfig.length > 0) {
+              // Mode mapel: ambil N soal acak per mapel lalu gabungkan
+              const picked: any[] = [];
+              subjectConfig.forEach(({ name, count }) => {
+                if (!name || !name.trim()) return;
+                const pool = qData.filter((q: any) => (q.subject || '').trim().toLowerCase() === name.trim().toLowerCase());
+                const numToPick = (count && count > 0) ? count : pool.length;
+                picked.push(...fyShuffle(pool).slice(0, numToPick));
+              });
+              finalQuestions = shouldShuffle ? fyShuffle(picked) : picked;
+            } else if (questionCount && questionCount > 0 && questionCount < qData.length) {
+              finalQuestions = fyShuffle(qData).slice(0, questionCount);
+            } else {
+              finalQuestions = shouldShuffle ? fyShuffle(qData) : qData;
+            }
+
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify(finalQuestions.map((q: any) => q.id)));
+            } catch (e) {}
+          }
+
           setQuestions(finalQuestions);
         }
 
-        // 3. Lapor kehadiran CCTV & Inisialisasi Sesi (Bypass RLS)
-        const userId = parsedUser.ticket_code || (parsedUser.id ? `NCC-${generateTicketCode(parsedUser.id)}` : (parsedUser.nisn || parsedUser.username));
-        
-        console.log(`[CBT INIT] userId=${userId} | examId=${examId}`);
-        
+        // 4. Lapor kehadiran CCTV & Inisialisasi Sesi (Bypass RLS)
         const { initCbtParticipantAttempt } = await import('@/app/actions/auth');
         const { data: existingUser, error: checkErr } = await initCbtParticipantAttempt(examId, userId);
         
@@ -676,16 +719,28 @@ export default function ExamRoom() {
             </div>
           ) : (
             <div className="bg-white p-6 md:p-10 rounded-[32px] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] min-h-[500px] flex flex-col relative">
-              <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-50">
-                 <span className="px-4 py-1.5 bg-gray-100 text-gray-600 rounded-full text-xs font-black tracking-widest">
-                   SOAL NO. {currentIndex + 1}
-                 </span>
+              <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-50 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="px-4 py-1.5 bg-gray-100 text-gray-700 rounded-full text-xs font-black tracking-widest">
+                    SOAL NO. {currentIndex + 1}
+                  </span>
+                  {currentQ.subject && (
+                    <span className="px-3.5 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-full text-xs font-black tracking-wide flex items-center gap-1">
+                      🏷️ {currentQ.subject}
+                    </span>
+                  )}
+                </div>
+
+                <span className="text-[11px] font-bold text-slate-400">
+                  {currentIndex + 1} dari {questions.length} Soal
+                </span>
               </div>
 
               <div className="flex-1">
-                <p className="text-lg font-medium text-gray-800 leading-relaxed mb-6 whitespace-pre-wrap">
-                  {currentQ.question_text || 'Deskripsi soal tidak tersedia.'}
-                </p>
+                <div 
+                  className="text-lg font-medium text-gray-800 leading-relaxed mb-6 whitespace-pre-wrap prose-slate"
+                  dangerouslySetInnerHTML={{ __html: renderMath(currentQ.question_text || 'Deskripsi soal tidak tersedia.') }}
+                />
                 {currentQ.image_url && <img src={currentQ.image_url} alt="Ilustrasi Soal" className="max-w-full h-auto rounded-xl border border-gray-100 mb-6 shadow-sm" />}
 
                  <div className="space-y-3 mt-8">
@@ -779,7 +834,10 @@ export default function ExamRoom() {
                               ${isSelected ? 'bg-[#5145cd] text-white' : 'bg-gray-100 text-gray-500 group-hover:bg-indigo-100 group-hover:text-[#5145cd]'}`}>
                               {letter}
                             </div>
-                            <span className={`text-sm font-medium ${isSelected ? 'text-indigo-900' : 'text-gray-700'}`}>{optionText}</span>
+                            <span 
+                              className={`text-sm font-medium ${isSelected ? 'text-indigo-900' : 'text-gray-700'}`}
+                              dangerouslySetInnerHTML={{ __html: renderMath(optionText) }}
+                            />
                           </button>
                         );
                       });

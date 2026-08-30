@@ -1900,5 +1900,235 @@ export async function getLeaderboardDataServer(examId: string) {
   }
 }
 
+/** Autentikasi Peserta CBT secara terpusat di Server (Bypass RLS via Service Role) */
+export async function authenticateParticipantServer(ticketInput: string, tokenInput?: string) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const inputClean = (ticketInput || '').trim().toUpperCase().replace(/^NCC[-\s]*/i, '').trim();
+    if (!inputClean) {
+      return { success: false, errorTitle: 'ID Tiket Kosong', errorDesc: 'Silakan masukkan ID Tiket peserta Anda.' };
+    }
+
+    // 1. Ambil data entries dan settings
+    const [{ data: allEntries }, { data: portalData }, { data: activeExams }, { data: tokenSettingsData }] = await Promise.all([
+      client.from('competition_entries').select('*'),
+      client.from('announcements').select('*').eq('title', 'SYS_PORTAL_SETTINGS').maybeSingle(),
+      client.from('cbt_exams').select('*').eq('is_active', true),
+      client.from('announcements').select('*').eq('title', 'SYS_TOKEN_SETTINGS').maybeSingle()
+    ]);
+
+    if (!allEntries || allEntries.length === 0) {
+      return { success: false, errorTitle: 'Data Peserta Kosong', errorDesc: 'Belum ada data pendaftar di sistem.' };
+    }
+
+    const { generateTicketCode } = await import('@/lib/utils');
+
+    const matchedUser = allEntries.find((entry: any) => {
+      let customId = "";
+      if (entry.notes) {
+        try {
+          const notesObj = JSON.parse(entry.notes);
+          if (notesObj.custom_ticket_id) {
+            customId = notesObj.custom_ticket_id.replace(/^NCC-/i, "").trim().toUpperCase();
+          }
+        } catch (e) {}
+      }
+      return generateTicketCode(entry.id) === inputClean || customId === inputClean || String(entry.id).toUpperCase() === inputClean;
+    });
+
+    if (!matchedUser) {
+      return {
+        success: false,
+        errorTitle: 'ID Tiket Tidak Ditemukan',
+        errorDesc: `Tidak ada peserta dengan ID Tiket "NCC-${inputClean}". Pastikan kode tiket Anda benar.`
+      };
+    }
+
+    // 2. Cek cabang lomba
+    const kolomCabang = matchedUser.competition_type || matchedUser.branch;
+    if (kolomCabang && !kolomCabang.toLowerCase().includes('mipa')) {
+      return {
+        success: false,
+        errorTitle: 'Akses Ditolak',
+        errorDesc: `Akun ini terdaftar di cabang ${kolomCabang}. Portal LLMS eksklusif untuk Olimpiade MIPA.`
+      };
+    }
+
+    // 3. Cek stage & payment
+    let paymentRequirementStage = 'registration';
+    if (portalData && portalData.content) {
+      try {
+        const parsed = JSON.parse(portalData.content);
+        if (parsed.paymentRequirementStage) paymentRequirementStage = parsed.paymentRequirementStage;
+      } catch (e) {}
+    }
+
+    let currentStage = 1;
+    let isFailed = false;
+    if (matchedUser.notes) {
+      try {
+        const notesObj = JSON.parse(matchedUser.notes);
+        if (notesObj.current_stage) currentStage = Number(notesObj.current_stage);
+        if (notesObj.is_failed) isFailed = Boolean(notesObj.is_failed);
+      } catch (e) {}
+    }
+
+    if (isFailed) {
+      return {
+        success: false,
+        errorTitle: 'Akses Ujian Ditutup',
+        errorDesc: 'Maaf, Anda dinyatakan tidak lolos ke babak berikutnya.'
+      };
+    }
+
+    let isPaymentRequired = true;
+    if (paymentRequirementStage === 'registration') {
+      isPaymentRequired = true;
+    } else if (paymentRequirementStage === 'tahap1') {
+      isPaymentRequired = currentStage >= 2;
+    } else if (paymentRequirementStage === 'tahap2') {
+      isPaymentRequired = currentStage >= 3;
+    } else if (paymentRequirementStage === 'free') {
+      isPaymentRequired = false;
+    }
+
+    if (isPaymentRequired && matchedUser.payment_status !== 'Verified') {
+      return {
+        success: false,
+        errorTitle: 'Peserta Belum Diverifikasi',
+        errorDesc: `Status pendaftaran masih "${matchedUser.payment_status}". Selesaikan verifikasi pembayaran terlebih dahulu.`
+      };
+    }
+
+    // 4. Cek Ujian Aktif
+    const exams = activeExams || [];
+    if (exams.length === 0) {
+      return {
+        success: false,
+        errorTitle: 'Tidak Ada Ujian Aktif',
+        errorDesc: 'Panitia belum membuka sesi ujian aktif saat ini.'
+      };
+    }
+
+    // 5. Token Check
+    let tokenSettings = { tokenEnabled: true, tokenIntervalMinutes: 10, isTokenPaused: false, pausedAt: null };
+    if (tokenSettingsData && tokenSettingsData.content) {
+      try {
+        const parsed = JSON.parse(tokenSettingsData.content);
+        tokenSettings = { ...tokenSettings, ...parsed };
+      } catch (e) {}
+    }
+
+    let matchedExam: any = null;
+
+    if (!tokenSettings.tokenEnabled) {
+      matchedExam = exams[0];
+    } else {
+      const userToken = (tokenInput || '').toUpperCase().trim();
+      if (!userToken) {
+        return {
+          success: false,
+          errorTitle: 'Token Wajib Diisi',
+          errorDesc: 'Sesi ujian ini memerlukan Token Akses dari pengawas.'
+        };
+      }
+
+      const intervalSec = (tokenSettings.tokenIntervalMinutes || 10) * 60;
+      const nowSec = tokenSettings.isTokenPaused && tokenSettings.pausedAt 
+        ? tokenSettings.pausedAt 
+        : Math.floor(Date.now() / 1000);
+
+      const currentInterval = Math.floor(nowSec / intervalSec);
+      const charPool = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      const targetIntervals = tokenSettings.isTokenPaused ? [currentInterval] : [currentInterval, currentInterval - 1, currentInterval + 1];
+
+      for (const exam of exams) {
+        let isMatched = false;
+        if (exam.token && exam.token.trim().toUpperCase() === userToken) {
+          isMatched = true;
+        }
+
+        if (!isMatched) {
+          for (const interval of targetIntervals) {
+            let expectedToken = "";
+            let idSum = 5381;
+            for (let i = 0; i < exam.id.length; i++) {
+              idSum = ((idSum * 33) ^ exam.id.charCodeAt(i)) >>> 0;
+            }
+            let seed = (idSum + interval) % 10000;
+            for (let i = 0; i < 6; i++) {
+              seed = (seed * 9301 + 49297) % 233280;
+              expectedToken += charPool[Math.floor((seed / 233280) * charPool.length)];
+            }
+
+            if (userToken === expectedToken) {
+              isMatched = true;
+              break;
+            }
+          }
+        }
+
+        if (isMatched) {
+          matchedExam = exam;
+          break;
+        }
+      }
+
+      if (!matchedExam) {
+        return {
+          success: false,
+          errorTitle: 'Token Ujian Tidak Valid',
+          errorDesc: 'Token salah atau sudah kedaluwarsa. Silakan cek token terbaru di layar pengawas.'
+        };
+      }
+    }
+
+    let finalTicketCode = "";
+    if (matchedUser.notes) {
+      try {
+        const notesObj = JSON.parse(matchedUser.notes);
+        if (notesObj.custom_ticket_id) {
+          finalTicketCode = notesObj.custom_ticket_id.toUpperCase();
+        }
+      } catch (e) {}
+    }
+    if (!finalTicketCode) {
+      finalTicketCode = `NCC-${generateTicketCode(matchedUser.id)}`;
+    }
+
+    const userData = {
+      ...matchedUser,
+      ticket_code: finalTicketCode,
+      active_exam_id: matchedExam.id,
+      active_exam_title: matchedExam.title,
+      active_exam_token: matchedExam.token,
+      login_time: new Date().toISOString()
+    };
+
+    return {
+      success: true,
+      user: userData,
+      errorTitle: null,
+      errorDesc: null
+    };
+  } catch (err: any) {
+    console.error("[Server Action] Exception authenticateParticipantServer:", err);
+    return {
+      success: false,
+      errorTitle: 'Terjadi Kendala Sistem',
+      errorDesc: err.message || 'Gagal memproses otentikasi peserta.'
+    };
+  }
+}
+
 
 

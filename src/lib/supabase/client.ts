@@ -16,10 +16,5 @@ export function createClient() {
     );
   }
 
-  return createBrowserClient(supabaseUrl, supabaseKey, {
-    auth: {
-      persistSession: true,
-      storage: typeof window !== 'undefined' ? window.sessionStorage : undefined
-    }
-  });
+  return createBrowserClient(supabaseUrl, supabaseKey);
 }
