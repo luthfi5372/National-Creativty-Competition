@@ -126,11 +126,22 @@ const ParticipantRow = memo(({ entry, onRowClick, onIdCardClick, onDeleteClick, 
       <td className="py-4 px-6 font-black text-blue-600">{getEntryTicketCode(entry)}</td>
       <td className="py-4 px-6 flex items-center gap-3">
          {photoUrl ? (
-           <img 
-             src={photoUrl} 
-             alt="Profile Avatar" 
-             className="w-10 h-10 rounded-full object-cover border border-blue-100 shrink-0" 
-           />
+           <>
+             <img 
+               src={photoUrl} 
+               alt="" 
+               onError={(e) => {
+                 e.currentTarget.style.display = 'none';
+                 if (e.currentTarget.nextElementSibling) {
+                   (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex';
+                 }
+               }}
+               className="w-10 h-10 rounded-full object-cover border border-blue-100 shrink-0" 
+             />
+             <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 hidden items-center justify-center font-bold text-blue-600 text-sm uppercase shrink-0">
+               {(entry.full_name || entry.email || "U").charAt(0)}
+             </div>
+           </>
          ) : (
            <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center font-bold text-blue-600 text-sm uppercase shrink-0">
              {(entry.full_name || entry.email || "U").charAt(0)}
@@ -2118,19 +2129,30 @@ function ModernHQDashboardContent() {
       try { photoUrl = JSON.parse(p.notes).profile_photo_url; } catch (e) {}
     }
     
-    if (photoUrl) {
-      return (
-        <img 
-          src={photoUrl} 
-          alt="Profile Avatar" 
-          className="w-24 h-24 rounded-full object-cover shadow-lg mb-6 border-4 border-white shrink-0" 
-        />
-      );
-    }
-    
     return (
-      <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-4xl font-black shadow-lg mb-6 border-4 border-white shrink-0">
-        {(p.full_name || "U").charAt(0)}
+      <div className="relative w-24 h-24 mb-6 shrink-0 flex items-center justify-center">
+        {photoUrl ? (
+          <>
+            <img 
+              src={photoUrl} 
+              alt="" 
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                if (e.currentTarget.nextElementSibling) {
+                  (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex';
+                }
+              }}
+              className="w-24 h-24 rounded-full object-cover shadow-lg border-4 border-white shrink-0" 
+            />
+            <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white hidden items-center justify-center text-4xl font-black shadow-lg border-4 border-white shrink-0">
+              {(p.full_name || "U").charAt(0)}
+            </div>
+          </>
+        ) : (
+          <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-4xl font-black shadow-lg border-4 border-white shrink-0">
+            {(p.full_name || "U").charAt(0)}
+          </div>
+        )}
       </div>
     );
   };

@@ -31,11 +31,22 @@ export default function DashboardHeader({ userEntry, currentUser, handleLogout, 
             
             if (photoUrl) {
               return (
-                <img 
-                  src={photoUrl} 
-                  alt="Profile Avatar" 
-                  className="w-10 h-10 rounded-full object-cover border border-blue-200" 
-                />
+                <div className="relative w-10 h-10 shrink-0 flex items-center justify-center">
+                  <img 
+                    src={photoUrl} 
+                    alt="" 
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      if (e.currentTarget.nextElementSibling) {
+                        (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex';
+                      }
+                    }}
+                    className="w-10 h-10 rounded-full object-cover border border-blue-200" 
+                  />
+                  <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full hidden items-center justify-center font-bold">
+                    {currentUser?.user_metadata?.full_name?.charAt(0)?.toUpperCase() || "P"}
+                  </div>
+                </div>
               );
             }
             
