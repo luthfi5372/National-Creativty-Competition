@@ -49,8 +49,21 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
 
     if (authError) throw authError;
 
-    // 2. Create profile in profiles table
+    // 2. Create profile in profiles table & Auto-confirm Email
     if (authData.user) {
+      try {
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (serviceRoleKey) {
+          const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+          const adminClient = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {
+            auth: { autoRefreshToken: false, persistSession: false }
+          });
+          await adminClient.auth.admin.updateUserById(authData.user.id, { email_confirm: true });
+        }
+      } catch (err) {
+        console.warn("Auto-confirm warning:", err);
+      }
+
       // Sync cookie so they can access dashboard immediately if logged in
       const cookieStore = await cookies();
       cookieStore.set("ncc_hint", "1", { path: "/", maxAge: 60 * 60 * 24 * 7 });

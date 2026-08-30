@@ -64,6 +64,8 @@ export default function JuryEvaluator() {
   const JURI_EMAILS = [
     "luthfi5372@gmail.com",
     "admin@ncc.id",
+    "admin1@ncc.id",
+    "halo.ncc@gmail.com",
     "juri@ncc.id",
     "evaluator@ncc.id"
   ];

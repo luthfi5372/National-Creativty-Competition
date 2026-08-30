@@ -301,12 +301,12 @@ export default function LiveMonitor() {
           info.school_origin || '-',
           info.branch || '-',
           isDone ? 'Selesai' : isBlocked ? 'Diblokir' : 'Aktif',
-          p.violations_count,
+          p.violations_count ?? 0,
           p.updated_at ? new Date(p.updated_at).toLocaleTimeString('id') : '-',
         ];
       })
     ];
-    const csv = rows.map(r => r.join(',')).join('\n');
+    const csv = rows.map(r => r.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }); // BOM for Excel
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
