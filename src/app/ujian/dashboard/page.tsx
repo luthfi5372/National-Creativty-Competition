@@ -169,62 +169,42 @@ export default function StudentDashboard() {
     };
     fetchAll();
 
-    // 📡 REALTIME: Durasi & Status ujian dari admin
+    // Poll exam & attempt status every 10 seconds (replaces realtime to save Supabase connection quota)
     if (parsedUser.active_exam_id) {
-      const examChannel = supabase
-        .channel(`dashboard_exam_sync_${parsedUser.active_exam_id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'cbt_exams',
-            filter: `id=eq.${parsedUser.active_exam_id}`
-          },
-          (payload: any) => {
-            const updated = payload.new;
-            if (!updated) return;
-            setExamDetail((prev: any) => ({ ...prev, ...updated }));
+      const userAttemptId = parsedUser.ticket_code || (parsedUser.id ? `NCC-${generateTicketCode(parsedUser.id)}` : (parsedUser.nisn || parsedUser.username));
+      
+      const pollStatus = async () => {
+        try {
+          const supabase = createClient();
+          const [{ data: examData }, { data: attemptData }] = await Promise.all([
+            supabase.from('cbt_exams').select('is_active, duration_minutes, title, token').eq('id', parsedUser.active_exam_id).single(),
+            supabase.from('cbt_attempts').select('violations_count, status, submitted_at').eq('user_id', userAttemptId).eq('exam_id', parsedUser.active_exam_id).single()
+          ]);
 
-            // Jika sesi dinonaktifkan admin saat peserta sedang di dashboard
-            if (updated.is_active === false) {
+          if (examData) {
+            setExamDetail((prev: any) => ({ ...prev, ...examData }));
+            if (examData.is_active === false) {
               localStorage.removeItem('ncc_user');
               router.push('/ujian/login');
             }
           }
-        )
-        .subscribe();
 
-      const userAttemptId = parsedUser.ticket_code || (parsedUser.id ? `NCC-${generateTicketCode(parsedUser.id)}` : (parsedUser.nisn || parsedUser.username));
-      const attemptChannel = supabase
-        .channel(`dashboard_attempt_sync_${userAttemptId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'cbt_attempts',
-            filter: `user_id=eq.${userAttemptId}`
-          },
-          (payload: any) => {
-            if (payload.new) {
-              if ((payload.new.violations_count || 0) < 3) {
-                setIsUserBlocked(false);
-                localStorage.removeItem(`cbt_blocked_${parsedUser.active_exam_id}`);
-                showToast("Akses ujian telah dibuka oleh Pengawas!", "success");
-              } else if ((payload.new.violations_count || 0) >= 3 && payload.new.status !== 'submitted') {
-                setIsUserBlocked(true);
-                localStorage.setItem(`cbt_blocked_${parsedUser.active_exam_id}`, 'true');
-              }
+          if (attemptData) {
+            if ((attemptData.violations_count || 0) < 3) {
+              setIsUserBlocked(false);
+              localStorage.removeItem(`cbt_blocked_${parsedUser.active_exam_id}`);
+            } else if ((attemptData.violations_count || 0) >= 3 && attemptData.status !== 'submitted') {
+              setIsUserBlocked(true);
+              localStorage.setItem(`cbt_blocked_${parsedUser.active_exam_id}`, 'true');
             }
           }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(examChannel);
-        supabase.removeChannel(attemptChannel);
+        } catch (err) {
+          console.error('[Dashboard Poll] Error:', err);
+        }
       };
+
+      const poll = setInterval(pollStatus, 10000);
+      return () => clearInterval(poll);
     }
   }, [router]);
 

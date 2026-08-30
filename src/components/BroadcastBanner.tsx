@@ -19,7 +19,7 @@ export default function BroadcastBanner({ examId }: BroadcastBannerProps) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // 📡 Ikat antena ke websocket realtime Supabase untuk tabel announcements
+    // 📡 Realtime subscription for emergency announcements (CRITICAL - must be instant during exams)
     const channel = supabase
       .channel('live-broadcast-channel')
       .on(

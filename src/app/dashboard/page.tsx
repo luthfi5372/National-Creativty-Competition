@@ -237,96 +237,11 @@ export default function UserDashboard() {
     };
     fetchData();
 
-    // --- 📡 REAL-TIME SUBSCRIPTION ENGINE ---
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'announcements'
-        },
-        (payload) => {
-          const updated = (payload.new || payload.old) as any;
-          if (!updated) return;
-
-          // 1. Jika ada perubahan timeline global
-          if (updated.title === 'SYSTEM_TIMELINE_CONFIG') {
-            try {
-              setGlobalTimeline(JSON.parse(updated.content));
-            } catch (e) {}
-          }
-          
-          // 2. Jika ada perubahan status gerbang pendaftaran/gelombang
-          if (updated.title === 'SYS_PORTAL_SETTINGS') {
-            try {
-              const parsed = JSON.parse(updated.content);
-              if (parsed.waves) setPortalWaves(parsed.waves);
-              if (parsed.paymentRequirementStage) setPaymentRequirementStage(parsed.paymentRequirementStage);
-              if (parsed.isRegistrationOpen !== undefined) setIsRegistrationOpen(parsed.isRegistrationOpen);
-              
-              const userCategory = userEntryRef.current?.competition_type || userEntryRef.current?.category; 
-              let matchingKeyPrefix = "";
-              if (userCategory === "Olimpiade MIPA") matchingKeyPrefix = "mipa";
-              else if (userCategory === "Speech Contest") matchingKeyPrefix = "speech";
-              else if (userCategory === "LKTI Nasional") matchingKeyPrefix = "lkti";
-              else if (userCategory === "MTQ" || userCategory === "MTQ Nasional") matchingKeyPrefix = "mtq";
-
-              if (matchingKeyPrefix && parsed.submissionStatus) {
-                const categorySubs = parsed.submissionStatus.filter((item: any) => item.id.startsWith(`${matchingKeyPrefix}_g`));
-                const openSubs = categorySubs.filter((item: any) => item.isOpen);
-                const isAnyOpen = openSubs.length > 0;
-                setIsSubmissionOpen(isAnyOpen);
-                
-                if (isAnyOpen) {
-                  const openWaveNames = openSubs.map((sub: any) => {
-                    const waveIdStr = sub.id.split('_g')[1];
-                    const wave = parsed.waves?.find((w: any) => w.id.toString() === waveIdStr);
-                    if (wave) {
-                      return wave.name.split(' (')[0];
-                    }
-                    const waveIdNum = parseInt(waveIdStr);
-                    const romanNumerals = ["", "I", "II", "III", "IV", "V"];
-                    return `Gelombang ${romanNumerals[waveIdNum] || waveIdStr}`;
-                  });
-                  const uniqueNames = Array.from(new Set(openWaveNames));
-                  setActiveSubmissionWave(uniqueNames.join(" & "));
-                } else {
-                  setActiveSubmissionWave("");
-                }
-              }
-            } catch (e) {}
-          }
-
-          // 3. JIKA ADA PENGUMUMAN BARU / DIHAPUS (REAL-TIME SYNC FOR USER BROADCASTS)
-          if (updated.title !== 'SYSTEM_TIMELINE_CONFIG' && updated.title !== 'SYS_PORTAL_SETTINGS' && updated.title !== 'SYS_TOKEN_SETTINGS') {
-            const refetchAnnouncements = async () => {
-              try {
-                const userStatus = userEntryRef.current?.payment_status === 'Verified' ? 'Verified' : 'Pending';
-                const currentUserObj = currentUserRef.current;
-                if (!currentUserObj?.id) return;
-
-                const { getParticipantBroadcasts } = await import("@/app/actions/auth");
-                const { data: latestAnnouncements } = await getParticipantBroadcasts(
-                  currentUserObj.id, 
-                  userStatus, 
-                  userEntryRef.current?.id, 
-                  currentUserObj.email
-                );
-                setAnnouncements(latestAnnouncements || []);
-              } catch (err) {
-                console.error("Gagal melakukan real-time sync pengumuman:", err);
-              }
-            };
-            refetchAnnouncements();
-          }
-        }
-      )
-      .subscribe();
+    // Poll every 60 seconds for announcements and portal settings changes (saves Supabase realtime quota)
+    const poll = setInterval(fetchData, 60000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(poll);
     };
   }, []); // Run exactly once on mount to prevent infinite fetch loop!
 

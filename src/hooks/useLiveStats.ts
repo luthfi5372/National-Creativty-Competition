@@ -48,24 +48,11 @@ export function useLiveStats() {
     if (typeof window === "undefined") return;
     fetchStats();
 
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === "ncc_competition_entries") fetchStats();
-    };
-    window.addEventListener("storage", handleStorage);
-
-    let cleanup: (() => void) | undefined;
-    import("@/lib/supabase/client").then(({ createClient }) => {
-      const supabase = createClient();
-      const channel = supabase
-        .channel("ncc_stats_channel")
-        .on("postgres_changes", { event: "*", schema: "public", table: "competition_entries" }, fetchStats)
-        .subscribe();
-      cleanup = () => { supabase.removeChannel(channel); };
-    }).catch(() => {});
+    // Polling every 60 seconds instead of realtime to reduce Supabase connection quota usage
+    const pollInterval = setInterval(fetchStats, 60000);
 
     return () => {
-      window.removeEventListener("storage", handleStorage);
-      cleanup?.();
+      clearInterval(pollInterval);
     };
   }, [fetchStats]);
 

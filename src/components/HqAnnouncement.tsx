@@ -12,7 +12,7 @@ export default function HqAnnouncement() {
   useEffect(() => {
     const supabase = createClient();
 
-    // 1. Initial Fetch
+    // Fetch announcement
     async function getInitial() {
       const { data } = await supabase
         .from('site_settings')
@@ -23,35 +23,17 @@ export default function HqAnnouncement() {
       if (data?.live_announcement && data.live_announcement.length > 5) {
         setMessage(data.live_announcement);
         setIsVisible(true);
+      } else {
+        setIsVisible(false);
       }
     }
     getInitial();
 
-    // 2. Real-time Subscription
-    const channel = supabase
-      .channel('site_settings_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'site_settings',
-          filter: 'id=eq.1'
-        },
-        (payload) => {
-          const newMsg = payload.new.live_announcement;
-          if (newMsg && newMsg.length > 5) {
-            setMessage(newMsg);
-            setIsVisible(true);
-          } else {
-            setIsVisible(false);
-          }
-        }
-      )
-      .subscribe();
+    // Poll every 30 seconds instead of realtime to save Supabase connection quota
+    const poll = setInterval(getInitial, 30000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(poll);
     };
   }, []);
 

@@ -61,39 +61,11 @@ export default function ParticipantLogin() {
 
     loadSettings();
 
-    const channel = supabase
-      .channel('public:sys_token_settings_login_' + Date.now())
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'announcements'
-        },
-        (payload: any) => {
-          if (payload.new && (payload.new.title === 'SYS_TOKEN_SETTINGS' || !payload.new.title)) {
-            if (payload.new.content) {
-              try {
-                const parsed = JSON.parse(payload.new.content);
-                setTokenSettings({
-                  tokenEnabled: parsed.tokenEnabled ?? true,
-                  tokenIntervalMinutes: Number(parsed.tokenIntervalMinutes) || 10,
-                  isTokenPaused: Boolean(parsed.isTokenPaused),
-                  pausedAt: parsed.pausedAt || null
-                });
-              } catch (e) {
-                loadSettings();
-              }
-            } else {
-              loadSettings();
-            }
-          }
-        }
-      )
-      .subscribe();
+    // Poll every 30 seconds for token settings changes (saves Supabase realtime connection quota)
+    const poll = setInterval(loadSettings, 30000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(poll);
     };
   }, []);
 

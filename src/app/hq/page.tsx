@@ -3092,27 +3092,10 @@ function ModernHQDashboardContent() {
       fetchUnregisteredData();
     }, 30000);
 
-    // 2. 📡 AKTIFKAN SENSOR RADAR (Supabase WebSockets)
-    const radarSubscription = supabase
-      .channel('pantau_pendaftaran_ncc')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'competition_entries' },
-        async (payload) => {
-          console.log("Radar mendeteksi pergerakan data!", payload);
-          // TIDAK memanggil ensureAdminSession di sini — session sudah dicek saat halaman dibuka
-          // Memanggil session check di real-time handler menyebabkan false-positive logout
-          await fetchRealData();
-          fetchUnregisteredData();
-        }
-      )
-      .subscribe();
-
-    // 3. Matikan radar secara otomatis jika Presiden menutup halaman
+    // 3. Matikan polling secara otomatis jika admin menutup halaman
     return () => {
       clearTimeout(safetyTimer);
       clearInterval(pollingInterval);
-      supabase.removeChannel(radarSubscription);
     };
   }, []);
 

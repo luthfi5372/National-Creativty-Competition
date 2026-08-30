@@ -82,15 +82,10 @@ export default function StatusCards({
     };
     loadConfigs();
 
-    const channel = supabase.channel('realtime-dashboard-configs')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, (payload) => {
-        if (payload.new && ['SYS_PAYMENT_CONFIG', 'SYS_COMMUNITY_GROUPS'].includes((payload.new as any).title)) {
-          loadConfigs();
-        }
-      })
-      .subscribe();
+    // Poll every 60 seconds for config changes instead of realtime to save connection quota
+    const poll = setInterval(loadConfigs, 60000);
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { clearInterval(poll); };
   }, []);
   
   // 🌊 DYNAMIC REGISTRATION OPEN CALCULATION FROM settings/waves

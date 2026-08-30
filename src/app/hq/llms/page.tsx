@@ -119,39 +119,11 @@ export default function IntegratedLLMSDashboard() {
     };
     fetchTokenConfig();
 
-    const tokenChannel = supabase
-      .channel('public:sys_token_settings_hq_' + Date.now())
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'announcements'
-        },
-        (payload: any) => {
-          if (payload.new && (payload.new.title === 'SYS_TOKEN_SETTINGS' || !payload.new.title)) {
-            if (payload.new.content) {
-              try {
-                const parsed = JSON.parse(payload.new.content);
-                setGlobalTokenConfig({
-                  tokenEnabled: parsed.tokenEnabled ?? true,
-                  tokenIntervalMinutes: Number(parsed.tokenIntervalMinutes) || 10,
-                  isTokenPaused: Boolean(parsed.isTokenPaused),
-                  pausedAt: parsed.pausedAt || null
-                });
-              } catch (e) {
-                fetchTokenConfig();
-              }
-            } else {
-              fetchTokenConfig();
-            }
-          }
-        }
-      )
-      .subscribe();
+    // Poll every 30 seconds for token settings updates (reduces Supabase realtime connection quota)
+    const poll = setInterval(fetchTokenConfig, 30000);
 
     return () => {
-      supabase.removeChannel(tokenChannel);
+      clearInterval(poll);
     };
   }, []);
 
@@ -434,14 +406,12 @@ export default function IntegratedLLMSDashboard() {
       console.warn("Safety timeout triggered: forcing loader closure in LLMS.");
     }, 5000);
 
-    const channel = supabase.channel('dashboard-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cbt_attempts' }, fetchTelemetryThrottled)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cbt_questions' }, fetchTelemetryThrottled)
-      .subscribe();
+    // Poll every 15 seconds for CBT data updates (replaces realtime to save Supabase connection quota)
+    const pollChannel = setInterval(fetchTelemetryThrottled, 15000);
 
     return () => { 
       clearTimeout(safetyTimer);
-      supabase.removeChannel(channel); 
+      clearInterval(pollChannel);
       if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
     };
   }, []);
