@@ -2353,5 +2353,64 @@ export async function uploadQuestionImageServerAction(formData: FormData) {
   }
 }
 
+/** 🗑️ Server Action: Hapus Peserta Secara Permanen (Bypass RLS & Hapus Auth User) */
+export async function deleteParticipantServerAction(entryId: number | string, userId?: string | null) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    if (userId) {
+      const { error: rpcErr } = await client.rpc('delete_participant_completely', {
+        target_user_id: userId
+      });
+      if (rpcErr) {
+        console.warn("RPC error, executing direct cascade:", rpcErr);
+        await client.from('jury_scores').delete().eq('entry_id', entryId);
+        await client.from('cbt_attempts').delete().eq('user_id', userId);
+        await client.from('competition_entries').delete().eq('id', entryId);
+        await client.from('profiles').delete().eq('id', userId);
+        if (serviceRoleKey) {
+          await client.auth.admin.deleteUser(userId);
+        }
+      }
+    } else {
+      await client.from('jury_scores').delete().eq('entry_id', entryId);
+      const { error } = await client.from('competition_entries').delete().eq('id', entryId);
+      if (error) throw error;
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception deleteParticipantServerAction:", err);
+    return { success: false, error: err.message || "Gagal menghapus peserta." };
+  }
+}
+
+/** 🗑️ Server Action: Hapus Banyak Peserta Sekaligus (Bypass RLS) */
+export async function bulkDeleteParticipantsServerAction(entries: { id: number | string; user_id?: string | null }[]) {
+  try {
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const entry of entries) {
+      const res = await deleteParticipantServerAction(entry.id, entry.user_id);
+      if (res.success) successCount++;
+      else failCount++;
+    }
+
+    return { success: true, successCount, failCount, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception bulkDeleteParticipantsServerAction:", err);
+    return { success: false, successCount: 0, failCount: entries.length, error: err.message || "Gagal menghapus peserta." };
+  }
+}
+
 
 

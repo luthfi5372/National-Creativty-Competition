@@ -29,7 +29,9 @@ import {
   getSchoolMessages, 
   getPortalSettings, 
   getTimelineConfig, 
-  getActiveExams 
+  getActiveExams,
+  deleteParticipantServerAction,
+  bulkDeleteParticipantsServerAction
 } from "@/app/actions/auth";
 
 import { 
@@ -1568,28 +1570,11 @@ function ModernHQDashboardContent() {
         .filter((e: any) => getParticipantWave(e) === deleteWaveConfirm.name);
       
       const idsToDelete = participantsToDelete.map((e: any) => e.id);
-      const userIdsToDelete = participantsToDelete.map((e: any) => e.user_id).filter(Boolean);
-
-      // Loop dan panggil RPC delete_participant_completely untuk setiap user_id agar akunnya benar-benar terhapus permanen!
-      if (userIdsToDelete.length > 0) {
-        for (const userId of userIdsToDelete) {
-          const { error: rpcError } = await supabase.rpc('delete_participant_completely', {
-            target_user_id: userId
-          });
-          if (rpcError) {
-            console.error(`Gagal menghapus user auth ${userId}:`, rpcError);
-          }
+      if (participantsToDelete.length > 0) {
+        const res = await bulkDeleteParticipantsServerAction(participantsToDelete.map((e: any) => ({ id: e.id, user_id: e.user_id })));
+        if (!res.success) {
+          console.error("Gagal menghapus peserta gelombang:", res.error);
         }
-      }
-
-      // Hapus sisa-sisa entri manual yang tidak memiliki user_id
-      const remainingIds = participantsToDelete.filter(p => !p.user_id).map(p => p.id);
-      if (remainingIds.length > 0) {
-        const { error } = await supabase
-          .from('competition_entries')
-          .delete()
-          .in('id', remainingIds);
-        if (error) throw error;
       }
       
       // Hapus dari state peserta juga
@@ -1907,31 +1892,19 @@ function ModernHQDashboardContent() {
 
   // --- 🗑️ FUNGSI PEMUSNAH ABSOLUT ---
   const executeDelete = async () => {
-    if (isDeleting) return;
+    if (isDeleting || !deleteModal.id) return;
     setIsDeleting(true);
     
     try {
-      if (deleteModal.userId) {
-        // PANGGIL FUNGSI RPC, BUKAN .delete()
-        const { error } = await supabase.rpc('delete_participant_completely', {
-          target_user_id: deleteModal.userId
-        });
-        if (error) throw error;
-      } else {
-        // Jika tidak ada user_id (peserta manual), hapus langsung dari competition_entries
-        const { error } = await supabase
-          .from('competition_entries')
-          .delete()
-          .eq('id', deleteModal.id);
-        if (error) throw error;
-      }
+      const res = await deleteParticipantServerAction(deleteModal.id, deleteModal.userId);
+      if (!res.success) throw new Error(res.error || "Gagal menghapus peserta.");
 
       // Bersihkan dari layar Markas Besar
-      setRealEntries(realEntries.filter((e: any) => e.id !== deleteModal.id));
+      setRealEntries((prev: any[]) => prev.filter((e: any) => e.id !== deleteModal.id));
       // Pastikan data yang terhapus juga dibersihkan dari Set pilihan
       setSelectedEntryIds(prev => {
         const next = new Set(prev);
-        next.delete(deleteModal.id);
+        next.delete(deleteModal.id as any);
         return next;
       });
       showToast(`Peserta ${deleteModal.name} berhasil dihapus permanen dari sistem!`, "success");
@@ -1984,44 +1957,21 @@ function ModernHQDashboardContent() {
   };
 
   const executeBulkDelete = async () => {
-    if (selectedEntryIds.size === 0) return;
+    if (selectedEntryIds.size === 0 || isBulkDeleting) return;
     setIsBulkDeleting(true);
-    let successCount = 0;
-    let failCount = 0;
 
     const entriesToDelete = realEntries.filter((e: any) => selectedEntryIds.has(e.id));
-    
-    for (const entry of entriesToDelete) {
-      try {
-        if (entry.user_id) {
-          const { error } = await supabase.rpc('delete_participant_completely', {
-            target_user_id: entry.user_id
-          });
-          if (error) throw error;
-        } else {
-          // Jika tidak ada user_id, hapus langsung dari competition_entries
-          const { error } = await supabase
-            .from('competition_entries')
-            .delete()
-            .eq('id', entry.id);
-          if (error) throw error;
-        }
-        successCount++;
-      } catch (err) {
-        failCount++;
-        console.error(`Gagal hapus ${entry.full_name}:`, err);
-      }
-    }
+    const res = await bulkDeleteParticipantsServerAction(entriesToDelete.map((e: any) => ({ id: e.id, user_id: e.user_id })));
 
     setRealEntries((prev: any[]) => prev.filter((e: any) => !selectedEntryIds.has(e.id)));
     setSelectedEntryIds(new Set());
     setShowBulkDeleteModal(false);
     setIsBulkDeleting(false);
 
-    if (failCount === 0) {
-      showToast(`✅ ${successCount} peserta berhasil dihapus permanen!`, "success");
+    if (res.failCount === 0) {
+      showToast(`✅ ${res.successCount} peserta berhasil dihapus permanen!`, "success");
     } else {
-      showToast(`⚠️ ${successCount} berhasil, ${failCount} gagal dihapus.`, "error");
+      showToast(`⚠️ ${res.successCount} berhasil, ${res.failCount} gagal dihapus.`, "error");
     }
   };
 
@@ -2053,16 +2003,14 @@ function ModernHQDashboardContent() {
     setIsDeletingUnregistered(true);
 
     try {
-      const { error } = await supabase.rpc('delete_participant_completely', {
-        target_user_id: deleteUnregisteredModal.id
-      });
-      if (error) throw error;
+      const res = await deleteParticipantServerAction('', deleteUnregisteredModal.id);
+      if (!res.success) throw new Error(res.error || "Gagal menghapus user.");
 
       // Hapus dari state layar
       setUnregisteredUsers(prev => prev.filter(u => u.id !== deleteUnregisteredModal.id));
       setSelectedUnregisteredUserIds(prev => {
         const next = new Set(prev);
-        next.delete(deleteUnregisteredModal.id);
+        next.delete(deleteUnregisteredModal.id!);
         return next;
       });
 
@@ -2078,33 +2026,19 @@ function ModernHQDashboardContent() {
   const executeBulkDeleteUnregistered = async () => {
     if (selectedUnregisteredUserIds.size === 0 || isBulkDeletingUnregistered) return;
     setIsBulkDeletingUnregistered(true);
-    let successCount = 0;
-    let failCount = 0;
 
     const userIds = Array.from(selectedUnregisteredUserIds);
-
-    for (const userId of userIds) {
-      try {
-        const { error } = await supabase.rpc('delete_participant_completely', {
-          target_user_id: userId
-        });
-        if (error) throw error;
-        successCount++;
-      } catch (err) {
-        failCount++;
-        console.error(`Gagal hapus user ${userId}:`, err);
-      }
-    }
+    const res = await bulkDeleteParticipantsServerAction(userIds.map(id => ({ id: '', user_id: id })));
 
     setUnregisteredUsers(prev => prev.filter(u => !selectedUnregisteredUserIds.has(u.id)));
     setSelectedUnregisteredUserIds(new Set());
     setShowBulkDeleteUnregisteredModal(false);
     setIsBulkDeletingUnregistered(false);
 
-    if (failCount === 0) {
-      showToast(`✅ ${successCount} user berhasil dihapus permanen!`, "success");
+    if (res.failCount === 0) {
+      showToast(`✅ ${res.successCount} user berhasil dihapus permanen!`, "success");
     } else {
-      showToast(`⚠️ ${successCount} berhasil, ${failCount} gagal dihapus.`, "error");
+      showToast(`⚠️ ${res.successCount} berhasil, ${res.failCount} gagal dihapus.`, "error");
     }
   };
 
