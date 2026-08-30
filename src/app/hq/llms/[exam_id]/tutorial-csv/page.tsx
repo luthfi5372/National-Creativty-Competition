@@ -33,28 +33,32 @@ export default function TutorialCSV() {
     // Template dengan kutip ganda agar aman untuk semua teks
     const lines = [
       `"Soal","Opsi A","Opsi B","Opsi C","Opsi D","Opsi E","Kunci Jawaban","Tingkat Kesulitan","Tipe Soal","Mata Pelajaran"`,
-      `"Siapakah penemu bola lampu?","Thomas Edison","Isaac Newton","Albert Einstein","Nikola Tesla","James Watt","A","MUDAH","pg","Fisika"`,
-      `"Berapa hasil dari 25 x 4?","","","","","","100","MUDAH","isian","Matematika"`,
-      `"Jelaskan bagaimana proses terjadinya siklus hujan secara singkat!","","","","","","Kunci: evaporasi, kondensasi, presipitasi","SEDANG","essay","Biologi"`,
+      `"Siapakah penemu bola lampu?","Thomas Edison","Isaac Newton","Albert Einstein","Nikola Tesla","James Watt","A","Easy","pg","Fisika"`,
+      `"Berapa hasil dari 25 x 4?","","","","","","100","Easy","isian","Matematika"`,
+      `"Jelaskan bagaimana proses terjadinya siklus hujan secara singkat!","","","","","","Kunci: evaporasi, kondensasi, presipitasi","Medium","essay","Biologi"`,
     ];
-    const csvContent = "data:text/csv;charset=utf-8," + lines.join('\n');
+    const csvContent = "\uFEFF" + lines.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", "Template_Soal_NCC13_v3.csv");
+    link.href = url;
+    link.download = "Template_Soal_NCC13_v3_10_Kolom.csv";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const correctExample = `"Soal","Opsi A","Opsi B","Opsi C","Opsi D","Opsi E","Kunci Jawaban","Tingkat Kesulitan","Tipe Soal","Mata Pelajaran"
-"Jika x > y dan y > z, manakah yang pasti benar?","x < z","x = z","x > z","x + y = z","Tidak dapat ditentukan","C","SEDANG","pg","Matematika"
-"Apakah ibukota Indonesia?","","","","","","Jakarta|DKI Jakarta","MUDAH","isian","Umum"`;
+"Jika x > y dan y > z, manakah yang pasti benar?","x < z","x = z","x > z","x + y = z","Tidak dapat ditentukan","C","Medium","pg","Matematika"
+"Apakah ibukota Indonesia?","","","","","","Jakarta|IKN","Easy","isian","Umum"
+"Sebutkan 3 macam zat pengisi termometer!","","","","","","alkohol|raksa|merkuri","Hard","isian","Fisika"`;
 
-  const wrongExample1 = `Soal,Opsi A,Opsi B,Opsi C,Opsi D,Opsi E,Kunci Jawaban,Tingkat Kesulitan,Tipe Soal
-Jika x > y dan y > z, manakah yang pasti benar?,x < z,x = z,x > z,x + y = z,Tidak dapat ditentukan,C,SEDANG,pg`;
+  const wrongExample1 = `Soal,Opsi A,Opsi B,Opsi C,Opsi D,Opsi E,Kunci Jawaban,Tingkat Kesulitan,Tipe Soal,Mata Pelajaran
+Jika x > y dan y > z, manakah yang pasti benar?,x < z,x = z,x > z,x + y = z,Tidak dapat ditentukan,C,Medium,pg,Matematika`;
 
   const wrongExample2 = `"Soal";"Opsi A";"Opsi B";"Kunci";"Kesulitan";"Tipe"
-"Berapa 1+1?";"Dua";"Tiga";"A";"MUDAH";"pg"`;
+"Berapa 1+1?";"Dua";"Tiga";"A";"Easy";"pg"`;
 
   const wrongExample3 = `"Soal","Opsi A","Opsi B","Kunci","Tipe"
 "Jika benar, maka salah. Pilih yang tepat!","Benar","Salah","A","pg"`;
@@ -73,14 +77,14 @@ Jika x > y dan y > z, manakah yang pasti benar?,x < z,x = z,x > z,x + y = z,Tida
               <h1 className="text-xl font-bold text-gray-800 flex items-center tracking-tight">
                 <Table className="w-6 h-6 text-indigo-500 mr-2" /> Panduan Lengkap Import CSV
               </h1>
-              <p className="text-xs text-gray-500 mt-0.5">Baca seluruh panduan ini sebelum mengimpor soal agar tidak ada data yang rusak.</p>
+              <p className="text-xs text-gray-500 mt-0.5">Format Resmi 10 Kolom (Mendukung PG, Isian, Essay, dan Mata Pelajaran).</p>
             </div>
           </div>
           <button
             onClick={downloadTemplate}
             className="flex items-center px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-indigo-100 active:scale-95 whitespace-nowrap"
           >
-            <FileDown className="w-5 h-5 mr-2" /> Unduh Template v2
+            <FileDown className="w-5 h-5 mr-2" /> Unduh Template v3 (10 Kolom)
           </button>
         </div>
 
@@ -106,7 +110,7 @@ Jika x > y dan y > z, manakah yang pasti benar?,x < z,x = z,x > z,x + y = z,Tida
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {[
-              { num: '1', color: 'indigo', icon: <FileDown className="w-6 h-6" />, title: 'Unduh Template', desc: 'Klik tombol "Unduh Template v2" di atas. Template sudah menggunakan format kutip ganda yang aman.' },
+              { num: '1', color: 'indigo', icon: <FileDown className="w-6 h-6" />, title: 'Unduh Template', desc: 'Klik tombol "Unduh Template v3" di atas. Template sudah menggunakan format 10 kolom dengan kutip ganda yang aman.' },
               { num: '2', color: 'emerald', icon: <Table className="w-6 h-6" />, title: 'Isi di Google Sheets', desc: 'Buka file CSV di Google Sheets (lebih aman dari Excel). Isi per kolom — satu baris = satu soal.' },
               { num: '3', color: 'amber', icon: <FileCheck className="w-6 h-6" />, title: 'Download sebagai CSV', desc: 'Di Google Sheets: File → Unduh → Comma Separated Values (.csv). Jangan ubah format ke Excel.' },
             ].map((s) => (
@@ -122,7 +126,7 @@ Jika x > y dan y > z, manakah yang pasti benar?,x < z,x = z,x > z,x + y = z,Tida
         {/* ─── STRUKTUR KOLOM ─── */}
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="p-7 border-b border-gray-100 bg-gray-50/50">
-            <h2 className="text-base font-black text-gray-800">Struktur Kolom (9 Kolom Berurutan)</h2>
+            <h2 className="text-base font-black text-gray-800">Struktur Kolom (10 Kolom Berurutan)</h2>
             <p className="text-xs text-gray-500 mt-1">Kolom TIDAK boleh dikurangi atau ditukar urutannya.</p>
           </div>
           <div className="overflow-x-auto">
@@ -143,9 +147,10 @@ Jika x > y dan y > z, manakah yang pasti benar?,x < z,x = z,x > z,x + y = z,Tida
                   { col: '4', header: 'Opsi C', wajib: false, color: 'slate', rule: 'Teks pilihan C. Opsional untuk tipe soal PG.' },
                   { col: '5', header: 'Opsi D', wajib: false, color: 'slate', rule: 'Teks pilihan D. Opsional untuk tipe soal PG.' },
                   { col: '6', header: 'Opsi E', wajib: false, color: 'slate', rule: 'Teks pilihan E. Opsional untuk tipe soal PG.' },
-                  { col: '7', header: 'Kunci Jawaban', wajib: true, color: 'emerald', rule: 'Untuk PG: Huruf pilihan benar (misal: A, AC). Untuk Isian Singkat: Kata kunci jawaban benar (contoh: Jakarta|DKI Jakarta). Untuk Essay: Panduan penilaian.' },
-                  { col: '8', header: 'Tingkat Kesulitan', wajib: true, color: 'amber', rule: 'Salah satu dari: Easy, Medium, atau Hard (bisa huruf besar/kecil).' },
+                  { col: '7', header: 'Kunci Jawaban', wajib: true, color: 'emerald', rule: 'Untuk PG: Huruf pilihan benar (misal: A, AC). Untuk Isian Singkat: Kata kunci jawaban benar (contoh: Jakarta|IKN). Untuk Essay: Panduan penilaian.' },
+                  { col: '8', header: 'Tingkat Kesulitan', wajib: true, color: 'amber', rule: 'Salah satu dari: Easy, Medium, atau Hard (bisa huruf besar/kecil seperti Mudah, Sedang, Sulit).' },
                   { col: '9', header: 'Tipe Soal', wajib: false, color: 'indigo', rule: 'Isi dengan "pg" (Pilihan Ganda), "isian" (Isian Singkat), atau "essay" (Essai Bebas). Jika kosong, otomatis dianggap "pg".' },
+                  { col: '10', header: 'Mata Pelajaran', wajib: false, color: 'purple', rule: 'Nama mapel untuk soal ini (contoh: Matematika, Fisika, Biologi, Kimia, atau Umum). Jika kosong, otomatis masuk kategori "Umum".' },
                 ].map((row) => (
                   <tr key={row.col} className="hover:bg-indigo-50/20 transition-colors">
                     <td className="py-5 px-5 text-center">
@@ -300,9 +305,9 @@ Jika x > y dan y > z, mana yang benar?,x<z,x=z,x>z,x+y=z,Tidak tentu,C,SEDANG
           </div>
           <div className="p-7 grid md:grid-cols-2 gap-6">
             {[
-              { icon: '📌', title: 'Baris pertama = header', desc: 'Baris pertama HARUS berisi nama kolom persis seperti template 9 kolom. Jangan diubah.' },
+              { icon: '📌', title: 'Baris pertama = header', desc: 'Baris pertama HARUS berisi nama kolom persis seperti template 10 kolom. Jangan diubah.' },
               { icon: '🔤', title: 'Kunci jawaban disesuaikan', desc: 'Untuk PG: Huruf pilihan (A-J). Untuk Isian: Kata kunci teks (pisahkan alternatif dengan |). Untuk Essay: Panduan nilai.' },
-              { icon: '📝', title: 'Tipe soal opsional', desc: 'Kolom ke-9 diisi dengan "pg", "isian", atau "essay". Jika dikosongkan, default ke Pilihan Ganda (pg).' },
+              { icon: '📝', title: 'Tipe soal & Mata Pelajaran', desc: 'Kolom ke-9 diisi dengan "pg", "isian", atau "essay". Kolom ke-10 diisi nama mapel (atau kosongkan untuk Umum).' },
               { icon: '🚫', title: 'Jangan merge sel di Excel', desc: 'Merge cell akan merusak struktur CSV. Pastikan setiap sel berdiri sendiri.' },
               { icon: '💬', title: 'Teks berkoma = wajib dikutip', desc: 'Jika teks soal/opsi mengandung koma, bungkus seluruh teks dengan tanda kutip ganda: "Jika A, maka B".' },
               { icon: '🔢', title: 'Angka dalam teks = aman', desc: 'Angka seperti 100, 3.14, atau -5 tidak perlu dikutip asalkan tidak mengandung koma.' },
@@ -342,11 +347,12 @@ Jika x > y dan y > z, mana yang benar?,x<z,x=z,x>z,x+y=z,Tidak tentu,C,SEDANG
           </h2>
           <div className="space-y-3">
             {[
-              'Baris pertama berisi header yang benar (9 kolom sesuai urutan)',
+              'Baris pertama berisi header yang benar (10 kolom sesuai urutan)',
               'Semua teks soal dan opsi yang mengandung koma sudah dibungkus kutip ganda "..."',
               'Kolom Kunci Jawaban berisi kunci jawaban yang sesuai dengan tipe soal',
-              'Kolom Tingkat Kesulitan hanya berisi: Easy, Medium, atau Hard',
+              'Kolom Tingkat Kesulitan hanya berisi: Easy, Medium, atau Hard (atau Mudah, Sedang, Sulit)',
               'Kolom Tipe Soal hanya berisi: pg, isian, atau essay',
+              'Kolom Mata Pelajaran (kolom ke-10) diisi nama mapel atau dikosongkan untuk kategori Umum',
               'Tidak ada baris yang kosong di tengah-tengah data',
               'File disimpan dalam format CSV, bukan .xlsx atau .xls',
               'Pemisah kolom adalah koma (,) bukan titik koma (;)',
