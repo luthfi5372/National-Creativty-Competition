@@ -122,10 +122,12 @@ export default function EditorBankSoal() {
     }
   };
   
-  // 📚 State Mata Pelajaran & Filter
+  // 📚 State Mata Pelajaran & Pengaturan Jumlah Soal
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [examSubjects, setExamSubjects] = useState<string[]>([]);
   const [examSubjectConfig, setExamSubjectConfig] = useState<{ name: string; count: number }[]>([]);
+  const [globalQuestionCount, setGlobalQuestionCount] = useState<number | null>(null);
+  const [modalGlobalCount, setModalGlobalCount] = useState<number | null>(null);
   const [filterSubject, setFilterSubject] = useState<string>('ALL');
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [showManageSubjectModal, setShowManageSubjectModal] = useState<boolean>(false);
@@ -159,7 +161,7 @@ export default function EditorBankSoal() {
         .order('created_at', { ascending: false }),
       supabase
         .from('cbt_exams')
-        .select('subject_config')
+        .select('subject_config, question_count')
         .eq('id', examId)
         .maybeSingle()
     ]);
@@ -172,6 +174,10 @@ export default function EditorBankSoal() {
       : [];
     setExamSubjectConfig(subConf);
     setModalSubjectList(subConf.length > 0 ? subConf : []);
+    
+    const qCount = examData?.question_count ?? null;
+    setGlobalQuestionCount(qCount);
+    setModalGlobalCount(qCount);
 
     // Kumpulkan seluruh mapel unik dari konfigurasi sesi DAN dari record soal yang sudah ada
     const configSubjects = subConf.map((s: any) => String(s.name || '')).filter((n: string) => n.trim() !== '');
@@ -681,21 +687,23 @@ export default function EditorBankSoal() {
     }
   };
 
-  const handleSaveSubjectConfig = async (newConfig: { name: string; count: number }[]) => {
+  const handleSaveSubjectConfig = async (newConfig: { name: string; count: number }[], targetGlobalCount?: number | null) => {
     setIsSavingSubjectConfig(true);
     try {
-      const res = await saveCbtExamSubjectConfigServerAction(examId, newConfig);
-      if (!res.success) throw new Error(res.error || "Gagal menyimpan mapel.");
+      const finalGlobalCount = targetGlobalCount !== undefined ? targetGlobalCount : modalGlobalCount;
+      const res = await saveCbtExamSubjectConfigServerAction(examId, newConfig, finalGlobalCount);
+      if (!res.success) throw new Error(res.error || "Gagal menyimpan pengaturan soal.");
 
       setExamSubjectConfig(newConfig);
+      setGlobalQuestionCount(newConfig.length > 0 ? null : finalGlobalCount);
       const configSubjects = newConfig.map(s => s.name).filter(n => n && n.trim() !== '');
       const questionSubjects = daftarSoal.map(q => String(q.subject || '')).filter(n => n.trim() !== '');
       const uniqueSubs = Array.from(new Set([...configSubjects, ...questionSubjects]));
       setExamSubjects(uniqueSubs);
-      showToast("Konfigurasi mata pelajaran berhasil disimpan!", "success");
+      showToast("Pengaturan jumlah soal & mapel berhasil disimpan!", "success");
       setShowManageSubjectModal(false);
     } catch (err: any) {
-      showToast(`Gagal simpan mapel: ${err.message}`, "error");
+      showToast(`Gagal simpan pengaturan: ${err.message}`, "error");
     } finally {
       setIsSavingSubjectConfig(false);
     }
@@ -737,12 +745,13 @@ export default function EditorBankSoal() {
           <button
             onClick={() => {
               setModalSubjectList(examSubjectConfig.length > 0 ? examSubjectConfig : examSubjects.map(s => ({ name: s, count: 0 })));
+              setModalGlobalCount(globalQuestionCount);
               setShowManageSubjectModal(true);
             }}
-            className="flex items-center px-4 py-2 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded-xl text-xs font-bold tracking-wide transition-all shadow-sm active:scale-95"
+            className="flex items-center px-4 py-2 bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-700 hover:from-purple-100 hover:to-indigo-100 border border-purple-200 rounded-xl text-xs font-bold tracking-wide transition-all shadow-sm active:scale-95"
           >
-            <Layers className="w-4 h-4 mr-2 text-purple-600" />
-            Kelola Mapel ({examSubjects.length})
+            <SlidersHorizontal className="w-4 h-4 mr-2 text-purple-600" />
+            🎯 Atur Soal Tampil ({examSubjectConfig.length > 0 ? `${examSubjectConfig.reduce((s, m) => s + (m.count || 0), 0)} Soal Mapel` : globalQuestionCount ? `${globalQuestionCount} Soal Acak` : 'Semua Soal'})
           </button>
 
           <button
@@ -1193,12 +1202,13 @@ export default function EditorBankSoal() {
             <button
               onClick={() => {
                 setModalSubjectList(examSubjectConfig.length > 0 ? examSubjectConfig : examSubjects.map(s => ({ name: s, count: 0 })));
+                setModalGlobalCount(globalQuestionCount);
                 setShowManageSubjectModal(true);
               }}
-              className="flex items-center px-3.5 py-2 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-purple-800 border border-purple-200 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
             >
-              <Layers className="w-3.5 h-3.5 mr-1.5 text-purple-600" />
-              Kelola Mapel
+              <SlidersHorizontal className="w-3.5 h-3.5 text-purple-600" />
+              Target Tampil: <span className="font-black underline">{examSubjectConfig.length > 0 ? `${examSubjectConfig.reduce((s, m) => s + (m.count || 0), 0)} Soal (Mapel)` : globalQuestionCount ? `${globalQuestionCount} Soal Acak` : `Semua ${daftarSoal.length} Soal`}</span>
             </button>
           </div>
         </div>
@@ -1529,18 +1539,18 @@ export default function EditorBankSoal() {
         </div>
       )}
 
-      {/* 📚 MODAL KELOLA MATA PELAJARAN */}
+      {/* 📚 MODAL PENGATURAN JUMLAH SOAL & MATA PELAJARAN */}
       {showManageSubjectModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md overflow-y-auto">
           <div className="bg-white border border-slate-100 w-full max-w-lg rounded-[32px] p-6 sm:p-8 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 text-left">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600">
-                  <Layers className="w-5 h-5" />
+                  <SlidersHorizontal className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-base font-black text-slate-900 uppercase tracking-wider">Kelola Mata Pelajaran</h2>
-                  <p className="text-xs text-slate-400 font-semibold mt-0.5">Atur nama mapel & jumlah soal yang akan diacak</p>
+                  <h2 className="text-base font-black text-slate-900 uppercase tracking-wider">Pengaturan Tampilan Soal</h2>
+                  <p className="text-xs text-slate-400 font-semibold mt-0.5">Atur berapa banyak soal yang akan dikerjakan siswa</p>
                 </div>
               </div>
               <button 
@@ -1551,75 +1561,124 @@ export default function EditorBankSoal() {
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
-                {modalSubjectList.length === 0 ? (
-                  <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-center text-slate-400 text-xs font-semibold">
-                    Belum ada mata pelajaran. Klik tombol di bawah untuk menambahkan.
-                  </div>
-                ) : (
-                  modalSubjectList.map((mapel, idx) => (
-                    <div key={idx} className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80">
-                      <input
-                        type="text"
-                        value={mapel.name}
-                        onChange={(e) => {
-                          const updated = [...modalSubjectList];
-                          updated[idx] = { ...updated[idx], name: e.target.value };
-                          setModalSubjectList(updated);
-                        }}
-                        placeholder="Nama mapel (cth: Matematika)"
-                        className="flex-1 bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none"
-                      />
-                      <div className="relative flex items-center">
-                        <input
-                          type="number"
-                          min={1}
-                          value={mapel.count || ''}
-                          onChange={(e) => {
-                            const updated = [...modalSubjectList];
-                            updated[idx] = { ...updated[idx], count: parseInt(e.target.value) || 0 };
-                            setModalSubjectList(updated);
-                          }}
-                          placeholder="0"
-                          className="w-20 bg-white border border-slate-200 focus:border-indigo-400 rounded-xl px-2.5 py-2 text-xs font-black text-slate-800 outline-none text-center pr-7"
-                        />
-                        <span className="absolute right-2 text-[8px] text-slate-400 font-bold pointer-events-none">soal</span>
-                      </div>
-                      <button
-                        onClick={() => setModalSubjectList(modalSubjectList.filter((_, i) => i !== idx))}
-                        className="w-8 h-8 flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-xl transition-colors shrink-0"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  ))
-                )}
+            <div className="space-y-5">
+              {/* OPSI 1: JUMLAH SOAL GLOBAL */}
+              <div className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl space-y-2">
+                <label className="text-[10px] font-black uppercase text-indigo-900 tracking-wider flex items-center justify-between">
+                  <span>1. Jumlah Soal Ditampilkan ke Peserta</span>
+                  {modalGlobalCount && modalSubjectList.length === 0 && (
+                    <span className="text-[9px] bg-indigo-200/80 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
+                      {modalGlobalCount} dari {daftarSoal.length} soal
+                    </span>
+                  )}
+                </label>
+                <div className="relative flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                  <input
+                    type="number"
+                    min={1}
+                    max={daftarSoal.length || 1000}
+                    value={modalGlobalCount || ''}
+                    onChange={(e) => setModalGlobalCount(e.target.value ? parseInt(e.target.value) : null)}
+                    placeholder={`Kosongkan = tampilkan semua ${daftarSoal.length} soal`}
+                    className="w-full bg-transparent px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none placeholder-slate-400"
+                  />
+                  <span className="absolute right-3 text-[10px] font-black text-slate-400 pointer-events-none">soal acak</span>
+                </div>
+                <p className="text-[9px] text-slate-500 font-semibold leading-relaxed">
+                  💡 <b>Contoh:</b> Simpan {daftarSoal.length} soal di bank, tapi setiap peserta hanya mengerjakan <b>40 soal acak</b>.
+                </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setModalSubjectList([...modalSubjectList, { name: '', count: 0 }])}
-                className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-purple-200 hover:border-purple-400 rounded-2xl text-xs font-black text-purple-600 hover:bg-purple-50/50 transition-all"
-              >
-                <Plus size={14} /> Tambah Mata Pelajaran Baru
-              </button>
+              {/* OPSI 2: PEMBAGIAN MAPEL */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                    2. Atau Bagi Proporsional per Mapel (Opsional)
+                  </label>
+                  {modalSubjectList.length > 0 && (
+                    <span className="text-[9px] font-black bg-purple-100 text-purple-700 px-2.5 py-0.5 rounded-full">
+                      Total: {modalSubjectList.reduce((sum, m) => sum + (m.count || 0), 0)} soal
+                    </span>
+                  )}
+                </div>
 
+                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  {modalSubjectList.length === 0 ? (
+                    <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-2xl text-center text-slate-400 text-xs font-semibold">
+                      Belum ada mata pelajaran. Klik tombol di bawah untuk menambah mapel jika ingin membagi kuota soal per mapel.
+                    </div>
+                  ) : (
+                    modalSubjectList.map((mapel, idx) => (
+                      <div key={idx} className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80">
+                        <input
+                          type="text"
+                          value={mapel.name}
+                          onChange={(e) => {
+                            const updated = [...modalSubjectList];
+                            updated[idx] = { ...updated[idx], name: e.target.value };
+                            setModalSubjectList(updated);
+                          }}
+                          placeholder="Nama mapel (cth: Matematika)"
+                          className="flex-1 bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none"
+                        />
+                        <div className="relative flex items-center">
+                          <input
+                            type="number"
+                            min={1}
+                            value={mapel.count || ''}
+                            onChange={(e) => {
+                              const updated = [...modalSubjectList];
+                              updated[idx] = { ...updated[idx], count: parseInt(e.target.value) || 0 };
+                              setModalSubjectList(updated);
+                            }}
+                            placeholder="0"
+                            className="w-20 bg-white border border-slate-200 focus:border-indigo-400 rounded-xl px-2.5 py-2 text-xs font-black text-slate-800 outline-none text-center pr-7"
+                          />
+                          <span className="absolute right-2 text-[8px] text-slate-400 font-bold pointer-events-none">soal</span>
+                        </div>
+                        <button
+                          onClick={() => setModalSubjectList(modalSubjectList.filter((_, i) => i !== idx))}
+                          className="w-8 h-8 flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-xl transition-colors shrink-0"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setModalSubjectList([...modalSubjectList, { name: '', count: 0 }])}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-purple-200 hover:border-purple-400 rounded-2xl text-xs font-black text-purple-600 hover:bg-purple-50/50 transition-all"
+                >
+                  <Plus size={13} /> Tambah Mata Pelajaran
+                </button>
+              </div>
+
+              {/* ACTION FOOTER */}
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
                 <span className="text-[11px] font-bold text-slate-500">
-                  Total Target: <b className="text-purple-600">{modalSubjectList.reduce((sum, m) => sum + (m.count || 0), 0)} soal</b>
+                  Target Akhir:{' '}
+                  <b className="text-indigo-600">
+                    {modalSubjectList.length > 0 
+                      ? `${modalSubjectList.reduce((sum, m) => sum + (m.count || 0), 0)} Soal (Mode Mapel)` 
+                      : modalGlobalCount 
+                        ? `${modalGlobalCount} Soal (Mode Acak)` 
+                        : `Semua ${daftarSoal.length} Soal`}
+                  </b>
                 </span>
                 <button
                   type="button"
                   disabled={isSavingSubjectConfig}
                   onClick={() => {
                     const valid = modalSubjectList.filter(m => m.name && m.name.trim() !== '');
-                    handleSaveSubjectConfig(valid);
+                    handleSaveSubjectConfig(valid, modalGlobalCount);
                   }}
-                  className="px-5 py-3 bg-purple-600 hover:bg-purple-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-lg shadow-purple-200 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                  className="px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-lg shadow-indigo-200 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
                 >
                   {isSavingSubjectConfig ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Save size={14} />}
-                  Simpan Mapel
+                  Simpan Pengaturan
                 </button>
               </div>
             </div>

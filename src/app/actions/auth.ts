@@ -2273,8 +2273,12 @@ export async function updateCbtQuestionSubjectServerAction(ids: string[], subjec
   }
 }
 
-/** ⚙️ Server Action: Simpan Konfigurasi Mapel Sesi Ujian (Bypass RLS) */
-export async function saveCbtExamSubjectConfigServerAction(examId: string, config: { name: string; count: number }[]) {
+/** ⚙️ Server Action: Simpan Konfigurasi Tampilan Soal & Mapel Sesi Ujian (Bypass RLS) */
+export async function saveCbtExamSubjectConfigServerAction(
+  examId: string, 
+  config: { name: string; count: number }[],
+  questionCount?: number | null
+) {
   try {
     const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -2286,9 +2290,14 @@ export async function saveCbtExamSubjectConfigServerAction(examId: string, confi
         })
       : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
 
+    const updatePayload: any = { subject_config: config };
+    if (questionCount !== undefined) {
+      updatePayload.question_count = config.length > 0 ? null : (questionCount || null);
+    }
+
     const { error } = await client
       .from('cbt_exams')
-      .update({ subject_config: config })
+      .update(updatePayload)
       .eq('id', examId);
 
     if (error) throw error;
