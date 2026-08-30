@@ -11,18 +11,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Data timeline tidak ditemukan' }, { status: 400 });
     }
 
-    // Gunakan anonymous client lalu login admin secara eksplisit
-    // agar tidak bergantung pada session cookie yang bisa kedaluwarsa
-    const supabase = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
+    // Gunakan service role client agar bypass RLS secara handal di server
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
-    // Login admin di sisi server agar bypass RLS
-    await supabase.auth.signInWithPassword({
-      email: 'admin1@ncc.id',
-      password: '123456',
-    });
+    const supabase = createSupabaseClient(
+      supabaseUrl,
+      serviceRoleKey || anonKey,
+      {
+        auth: { autoRefreshToken: false, persistSession: false }
+      }
+    );
 
     // 1. Cari data lama
     const { data: existing } = await supabase
