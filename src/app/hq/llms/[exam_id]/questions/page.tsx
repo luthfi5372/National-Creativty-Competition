@@ -9,7 +9,8 @@ import {
   bulkImportCbtQuestionsServerAction, 
   deleteCbtQuestionServerAction, 
   updateCbtQuestionSubjectServerAction, 
-  saveCbtExamSubjectConfigServerAction 
+  saveCbtExamSubjectConfigServerAction,
+  uploadQuestionImageServerAction
 } from '@/app/actions/auth';
 import { 
   ArrowLeft, 
@@ -237,23 +238,15 @@ export default function EditorBankSoal() {
     let finalImageUrl = imagePreviewUrl; // Pertahankan URL lama jika mode edit
 
     try {
-      // Proses upload gambar jika ada file baru yang dipilih
+      // Proses upload gambar jika ada file baru yang dipilih (Bypass RLS via Server Action)
       if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `${examId}/${fileName}`;
+        const formData = new FormData();
+        formData.append('file', imageFile);
+        formData.append('examId', examId);
 
-        const { error: uploadError } = await supabase.storage
-          .from('question-images')
-          .upload(filePath, imageFile);
-
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from('question-images')
-          .getPublicUrl(filePath);
-        
-        finalImageUrl = publicUrlData.publicUrl;
+        const uploadRes = await uploadQuestionImageServerAction(formData);
+        if (!uploadRes.success) throw new Error(uploadRes.error || "Gagal mengunggah gambar soal.");
+        finalImageUrl = uploadRes.url;
       }
 
       const finalOptions: Record<string, any> = {

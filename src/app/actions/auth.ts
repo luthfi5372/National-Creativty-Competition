@@ -2308,5 +2308,50 @@ export async function saveCbtExamSubjectConfigServerAction(
   }
 }
 
+/** 🖼️ Server Action: Upload Gambar Soal CBT (Bypass RLS dengan Service Role Key) */
+export async function uploadQuestionImageServerAction(formData: FormData) {
+  try {
+    const file = formData.get('file') as File;
+    const examId = formData.get('examId') as string;
+
+    if (!file || !examId) {
+      return { success: false, url: null, error: "File gambar atau ID ujian tidak valid." };
+    }
+
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const fileExt = file.name.split('.').pop() || 'png';
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+    const filePath = `${examId}/${fileName}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    const { error: uploadError } = await client.storage
+      .from('question-images')
+      .upload(filePath, buffer, {
+        contentType: file.type || 'image/png',
+        upsert: true
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: publicUrlData } = client.storage
+      .from('question-images')
+      .getPublicUrl(filePath);
+
+    return { success: true, url: publicUrlData.publicUrl, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception uploadQuestionImageServerAction:", err);
+    return { success: false, url: null, error: err.message || "Gagal mengunggah gambar soal." };
+  }
+}
+
 
 
