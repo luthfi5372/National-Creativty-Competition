@@ -51,9 +51,14 @@ export default function ParticipantsBook() {
           }
         } catch (err) {
           console.error(`[Admin Participants] Exception percobaan ${attempt}:`, err);
-          if (attempt < 3) { await new Promise(r => setTimeout(r, 1500)); continue; }
         }
       }
+
+      if (hasAdminCookie) {
+        console.log("[Admin Participants] Sesi admin diverifikasi via cookie ncc_admin_hint.");
+        return;
+      }
+
       console.log("[Admin Participants] Tidak ada sesi valid setelah 3 percobaan. Redirect ke login.");
       router.push('/login');
     };

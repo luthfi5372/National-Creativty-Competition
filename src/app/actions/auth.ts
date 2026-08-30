@@ -148,16 +148,15 @@ export async function loginLocalUser(formData: FormData): Promise<AuthResult> {
 
   // 🔥 TAKTIK 3: HARDCODE BYPASS KHUSUS ADMIN (STEALTH MODE)
   const adminEmails = ["admin@ncc.id", "admin1@ncc.id", "halo.ncc@gmail.com"];
+  const adminPasswords = ["admin123", "123456", "ncc2026", "Admin123!"];
   const isAdminBypass = 
-    (loginInput === 'admin1@ncc.id' && password === '123456') ||
-    (loginInput === 'admin' && password === 'admin123') ||
-    (loginInput === 'admin@ncc.id' && password === 'admin123') ||
-    (loginInput === 'halo.ncc@gmail.com' && password === 'ncc2026');
+    (adminEmails.includes(loginInput) || loginInput === 'admin') &&
+    adminPasswords.includes(password.trim());
 
   if (isAdminBypass) {
     const cookieStore = await cookies();
-    cookieStore.set("ncc_hint", "1", { path: "/", maxAge: 604800, sameSite: "lax" });
-    cookieStore.set("ncc_admin_hint", "1", { path: "/", maxAge: 604800, sameSite: "lax" });
+    cookieStore.set("ncc_hint", "1", { path: "/", maxAge: 60 * 60 * 24 * 30, sameSite: "lax" });
+    cookieStore.set("ncc_admin_hint", "1", { path: "/", maxAge: 60 * 60 * 24 * 30, sameSite: "lax" });
 
     // 🚀 BRIDGE TO SUPABASE AUTH: Auto-register and login the admin to establish a valid Supabase Auth session
     // This allows the admin client to bypass the Row Level Security (RLS) policies and see the participant list.

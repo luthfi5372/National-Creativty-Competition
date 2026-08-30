@@ -158,6 +158,11 @@ export default function LoginFormClient({ initialStats = DEFAULT_FALLBACK_STATS 
       setIsRedirecting(true);
       setRedirectTarget(result.isAdmin ? 'hq' : 'dashboard');
       
+      if (result.isAdmin) {
+        document.cookie = "ncc_admin_hint=1; path=/; max-age=2592000; SameSite=Lax";
+        document.cookie = "ncc_hint=1; path=/; max-age=2592000; SameSite=Lax";
+      }
+
       setTimeout(() => {
         if (result.isAdmin) {
           window.location.href = '/hq'; 

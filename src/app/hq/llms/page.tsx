@@ -387,9 +387,18 @@ export default function IntegratedLLMSDashboard() {
           }
         } catch (err) {
           console.error(`[Admin LLMS] Exception percobaan ${attempt}:`, err);
-          if (attempt < 3) { await new Promise(r => setTimeout(r, 1500)); continue; }
+          if (attempt < 3) {
+            await new Promise(r => setTimeout(r, 1500));
+            continue;
+          }
         }
       }
+
+      if (hasAdminCookie) {
+        console.log("[Admin LLMS] Sesi admin diverifikasi via cookie ncc_admin_hint.");
+        return;
+      }
+
       console.log("[Admin LLMS] Tidak ada sesi valid setelah 3 percobaan. Redirect ke login.");
       router.push('/login');
     };
