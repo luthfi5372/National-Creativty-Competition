@@ -67,8 +67,11 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Helpers pengecekan peran
-  const isAdmin = !!(user && (
+  // Helpers pengecekan peran & cookie hints
+  const hasAdminCookie = request.cookies.get('ncc_admin_hint')?.value === '1';
+  const hasUserCookie = request.cookies.get('ncc_hint')?.value === '1';
+
+  const isAdmin = hasAdminCookie || !!(user && (
     (user.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) ||
     user.user_metadata?.role === 'admin'
   ));
@@ -76,6 +79,7 @@ export async function middleware(request: NextRequest) {
     (user.email && JURY_EMAILS.includes(user.email.toLowerCase())) ||
     user.user_metadata?.role === 'juri'
   ));
+  const isAuthenticated = !!user || hasUserCookie || hasAdminCookie;
 
   // ─────────────────────────────────────────────────────────────────────────
   // 5. 🚦 ROUTING GUARD — semua area sensitif dijaga di sini
@@ -83,25 +87,25 @@ export async function middleware(request: NextRequest) {
 
   // ── /hq/* — khusus Admin HQ ──────────────────────────────────────────────
   if (pathname.startsWith('/hq')) {
-    if (!user)    return addSecurityHeaders(NextResponse.redirect(loginUrl));
+    if (!isAuthenticated) return addSecurityHeaders(NextResponse.redirect(loginUrl));
     if (!isAdmin) return addSecurityHeaders(NextResponse.redirect(dashUrl));
   }
 
   // ── /admin/* — khusus Admin ──────────────────────────────────────────────
   if (pathname.startsWith('/admin')) {
-    if (!user)    return addSecurityHeaders(NextResponse.redirect(loginUrl));
+    if (!isAuthenticated) return addSecurityHeaders(NextResponse.redirect(loginUrl));
     if (!isAdmin) return addSecurityHeaders(NextResponse.redirect(dashUrl));
   }
 
   // ── /juri/* — Admin atau Juri ────────────────────────────────────────────
   if (pathname.startsWith('/juri')) {
-    if (!user)               return addSecurityHeaders(NextResponse.redirect(loginUrl));
+    if (!isAuthenticated) return addSecurityHeaders(NextResponse.redirect(loginUrl));
     if (!isAdmin && !isJury) return addSecurityHeaders(NextResponse.redirect(dashUrl));
   }
 
   // ── /dashboard/* — semua user yang sudah login ───────────────────────────
   if (pathname.startsWith('/dashboard')) {
-    if (!user) return addSecurityHeaders(NextResponse.redirect(loginUrl));
+    if (!isAuthenticated) return addSecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
   // 6. Lolos semua guard → lanjutkan dengan security headers

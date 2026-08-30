@@ -21,11 +21,11 @@ interface LoginFormClientProps {
 }
 
 const DEFAULT_FALLBACK_STATS: GlobalStats = {
-  totalParticipants: 250,
-  provinces: 34,
+  totalParticipants: 0,
+  provinces: 0,
   categories: 4,
-  categoryBreakdown: { "Olimpiade MIPA": 100, "Speech Contest": 50, "LKTI Nasional": 60, "MTQ Nasional": 40 },
-  regionStats: { "Sumatera": 50, "Jawa": 120, "Kalimantan": 30, "Sulawesi": 30, "Papua": 10, "Bali & Nusa Tenggara": 10 },
+  categoryBreakdown: { "Olimpiade MIPA": 0, "Speech Contest": 0, "LKTI Nasional": 0, "MTQ Nasional": 0 },
+  regionStats: { "Sumatera": 0, "Jawa": 0, "Kalimantan": 0, "Sulawesi": 0, "Papua": 0, "Bali & Nusa Tenggara": 0 },
   detailedProvinceStats: {}
 };
 
@@ -44,9 +44,9 @@ export default function LoginFormClient({ initialStats = DEFAULT_FALLBACK_STATS 
   const [forgotSuccess, setForgotSuccess] = useState(false);
   const router = useRouter();
 
-  // Initialize with server-rendered statistics, then sync in real-time
+  // Initialize with real-time live statistics from database
   const { stats: liveStats } = useLiveStats();
-  const activeStats = liveStats.totalParticipants > 0 ? liveStats : initialStats;
+  const activeStats = liveStats || initialStats;
 
   const handleForgotPassword = async () => {
     const targetEmail = forgotEmail.trim() || email.trim();
@@ -270,7 +270,7 @@ export default function LoginFormClient({ initialStats = DEFAULT_FALLBACK_STATS 
               transition={{ delay: 0.5 }}
               className="bg-white/10 border border-white/10 rounded-2xl p-4 text-center min-h-[96px] flex flex-col justify-center"
             >
-              <div className="text-2xl font-extrabold">{activeStats.totalParticipants}+</div>
+              <div className="text-2xl font-extrabold">{activeStats.totalParticipants}</div>
               <div className="text-xs text-indigo-200 mt-1">Peserta</div>
             </motion.div>
             <motion.div
@@ -279,7 +279,7 @@ export default function LoginFormClient({ initialStats = DEFAULT_FALLBACK_STATS 
               transition={{ delay: 0.6 }}
               className="bg-white/10 border border-white/10 rounded-2xl p-4 text-center min-h-[96px] flex flex-col justify-center"
             >
-              <div className="text-2xl font-extrabold">{activeStats.provinces}+</div>
+              <div className="text-2xl font-extrabold">{activeStats.provinces}</div>
               <div className="text-xs text-indigo-200 mt-1">Provinsi</div>
             </motion.div>
             <motion.div
