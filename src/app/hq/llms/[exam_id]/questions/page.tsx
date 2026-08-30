@@ -5,6 +5,13 @@ import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { 
+  saveCbtQuestionServerAction, 
+  bulkImportCbtQuestionsServerAction, 
+  deleteCbtQuestionServerAction, 
+  updateCbtQuestionSubjectServerAction, 
+  saveCbtExamSubjectConfigServerAction 
+} from '@/app/actions/auth';
+import { 
   ArrowLeft, 
   CheckCircle, 
   FileText, 
@@ -286,24 +293,8 @@ export default function EditorBankSoal() {
         status: 'Published'
       };
 
-      if (editingId) {
-        // --- MODE UPDATE (EDIT DATA LAMA) ---
-        const { error: updateError } = await supabase
-          .from('cbt_questions')
-          .update(payload)
-          .eq('id', editingId);
-
-        if (updateError) throw updateError;
-        setEditingId(null);
-      } else {
-        // --- MODE INSERT (BUAT SOAL BARU) ---
-        const { error: insertError } = await supabase.from('cbt_questions').insert([{
-          ...payload,
-          exam_id: examId
-        }]);
-
-        if (insertError) throw insertError;
-      }
+      const res = await saveCbtQuestionServerAction(editingId, editingId ? payload : { ...payload, exam_id: examId });
+      if (!res.success) throw new Error(res.error || "Gagal menyimpan soal.");
 
       // Bersihkan form kembali seperti semula
       resetForm();
@@ -547,8 +538,8 @@ export default function EditorBankSoal() {
         }
 
         if (dataInsert.length > 0) {
-          const { error } = await supabase.from('cbt_questions').insert(dataInsert);
-          if (error) throw error;
+          const res = await bulkImportCbtQuestionsServerAction(examId, dataInsert);
+          if (!res.success) throw new Error(res.error || "Gagal mengimpor soal ke database.");
           fetchSoalTersimpan();
 
           if (skippedCount > 0) {
@@ -651,7 +642,11 @@ export default function EditorBankSoal() {
 
   const handleHapusSoal = async (id: string) => {
     if (!window.confirm("Hapus permanen soal ini dari sistem?")) return;
-    await supabase.from('cbt_questions').delete().eq('id', id);
+    const res = await deleteCbtQuestionServerAction(id);
+    if (!res.success) {
+      showToast(`Gagal menghapus soal: ${res.error}`, "error");
+      return;
+    }
     fetchSoalTersimpan();
     showToast("Soal berhasil dihapus!", "success");
     if(editingId === id) resetForm();
@@ -659,19 +654,13 @@ export default function EditorBankSoal() {
 
   const handleQuickSetSubject = async (questionId: string, subjectName: string | null) => {
     const finalSubject = subjectName ? subjectName.trim() : null;
-    try {
-      const { error } = await supabase
-        .from('cbt_questions')
-        .update({ subject: finalSubject })
-        .eq('id', questionId);
-
-      if (error) throw error;
-
-      setDaftarSoal(prev => prev.map(q => q.id === questionId ? { ...q, subject: finalSubject } : q));
-      showToast(finalSubject ? `Soal berhasil diubah ke mapel "${finalSubject}"` : "Soal diubah ke kategori Umum", "success");
-    } catch (err: any) {
-      showToast(`Gagal mengubah mapel: ${err.message}`, "error");
+    const res = await updateCbtQuestionSubjectServerAction([questionId], finalSubject);
+    if (!res.success) {
+      showToast(`Gagal mengubah mapel: ${res.error}`, "error");
+      return;
     }
+    setDaftarSoal(prev => prev.map(q => q.id === questionId ? { ...q, subject: finalSubject } : q));
+    showToast(finalSubject ? `Soal berhasil diubah ke mapel "${finalSubject}"` : "Soal diubah ke kategori Umum", "success");
   };
 
   const handleBatchSetSubject = async (targetSubject: string | null) => {
@@ -679,12 +668,8 @@ export default function EditorBankSoal() {
     const finalSubject = (targetSubject === '__CLEAR__' || !targetSubject) ? null : targetSubject.trim();
     setIsBatchUpdating(true);
     try {
-      const { error } = await supabase
-        .from('cbt_questions')
-        .update({ subject: finalSubject })
-        .in('id', selectedQuestionIds);
-
-      if (error) throw error;
+      const res = await updateCbtQuestionSubjectServerAction(selectedQuestionIds, finalSubject);
+      if (!res.success) throw new Error(res.error || "Gagal update mapel massal.");
 
       setDaftarSoal(prev => prev.map(q => selectedQuestionIds.includes(q.id) ? { ...q, subject: finalSubject } : q));
       showToast(`Berhasil memindahkan ${selectedQuestionIds.length} soal ke mapel ${finalSubject || 'Umum'}!`, "success");
@@ -699,12 +684,8 @@ export default function EditorBankSoal() {
   const handleSaveSubjectConfig = async (newConfig: { name: string; count: number }[]) => {
     setIsSavingSubjectConfig(true);
     try {
-      const { error } = await supabase
-        .from('cbt_exams')
-        .update({ subject_config: newConfig })
-        .eq('id', examId);
-
-      if (error) throw error;
+      const res = await saveCbtExamSubjectConfigServerAction(examId, newConfig);
+      if (!res.success) throw new Error(res.error || "Gagal menyimpan mapel.");
 
       setExamSubjectConfig(newConfig);
       const configSubjects = newConfig.map(s => s.name).filter(n => n && n.trim() !== '');

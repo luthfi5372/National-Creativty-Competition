@@ -2159,5 +2159,145 @@ export async function authenticateParticipantServer(ticketInput: string, tokenIn
   }
 }
 
+/** 📥 Server Action: Simpan / Update Soal CBT (Bypass RLS dengan Service Role Key) */
+export async function saveCbtQuestionServerAction(editingId: string | null, payload: any) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    if (editingId) {
+      const { data, error } = await client
+        .from('cbt_questions')
+        .update(payload)
+        .eq('id', editingId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data, error: null };
+    } else {
+      const { data, error } = await client
+        .from('cbt_questions')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, data, error: null };
+    }
+  } catch (err: any) {
+    console.error("[Server Action] Exception saveCbtQuestionServerAction:", err);
+    return { success: false, data: null, error: err.message || "Gagal menyimpan soal." };
+  }
+}
+
+/** 📥 Server Action: Bulk Import Soal CBT Massal (Bypass RLS dengan Service Role Key) */
+export async function bulkImportCbtQuestionsServerAction(examId: string, questions: any[]) {
+  try {
+    if (!questions || questions.length === 0) {
+      return { success: false, count: 0, error: "Tidak ada data soal untuk diimpor." };
+    }
+
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { error } = await client.from('cbt_questions').insert(questions);
+    if (error) throw error;
+
+    return { success: true, count: questions.length, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception bulkImportCbtQuestionsServerAction:", err);
+    return { success: false, count: 0, error: err.message || "Gagal mengimpor soal massal." };
+  }
+}
+
+/** 🗑️ Server Action: Hapus Soal CBT (Bypass RLS) */
+export async function deleteCbtQuestionServerAction(id: string) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { error } = await client.from('cbt_questions').delete().eq('id', id);
+    if (error) throw error;
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception deleteCbtQuestionServerAction:", err);
+    return { success: false, error: err.message || "Gagal menghapus soal." };
+  }
+}
+
+/** 🏷️ Server Action: Update Mapel Soal Cepat / Batch (Bypass RLS) */
+export async function updateCbtQuestionSubjectServerAction(ids: string[], subject: string | null) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { error } = await client
+      .from('cbt_questions')
+      .update({ subject })
+      .in('id', ids);
+
+    if (error) throw error;
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception updateCbtQuestionSubjectServerAction:", err);
+    return { success: false, error: err.message || "Gagal update mapel soal." };
+  }
+}
+
+/** ⚙️ Server Action: Simpan Konfigurasi Mapel Sesi Ujian (Bypass RLS) */
+export async function saveCbtExamSubjectConfigServerAction(examId: string, config: { name: string; count: number }[]) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const { error } = await client
+      .from('cbt_exams')
+      .update({ subject_config: config })
+      .eq('id', examId);
+
+    if (error) throw error;
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception saveCbtExamSubjectConfigServerAction:", err);
+    return { success: false, error: err.message || "Gagal menyimpan konfigurasi mapel." };
+  }
+}
+
 
 
