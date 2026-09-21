@@ -374,20 +374,6 @@ export default function IndonesiaMap() {
               </p>
             </motion.div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 transition-all hover:shadow-xl hover:shadow-indigo-500/5 group cursor-default">
-                <Users size={20} className="text-indigo-600 mb-3 group-hover:scale-110 transition-transform" />
-                <div className="text-2xl font-black text-slate-900">
-                  {stats.totalParticipants > 0 ? `${Math.min(100, Math.max(1, Math.round((stats.totalParticipants / 100) * 100)))}%` : "0%"}
-                </div>
-                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Target Kuota Terisi</div>
-              </div>
-              <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 transition-all hover:shadow-xl hover:shadow-indigo-500/5 group cursor-default">
-                <TrendingUp size={20} className="text-indigo-600 mb-3 group-hover:scale-110 transition-transform" />
-                <div className="text-2xl font-black text-slate-900">{stats.provinces}</div>
-                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Provinsi Aktif</div>
-              </div>
-            </div>
 
             {/* Real-time Regional Breakdown Panel */}
             <div className="p-6 bg-white/60 backdrop-blur-md rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
