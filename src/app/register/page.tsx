@@ -21,6 +21,7 @@ const CATEGORIES = [
 export default function RegisterPage() {
   const [fullName, setFullName] = useState("");
   const [school, setSchool] = useState("");
+  const [npsn, setNpsn] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -50,6 +51,7 @@ export default function RegisterPage() {
     formData.append("username", email.split('@')[0]);
     formData.append("fullName", fullName);
     formData.append("school", school);
+    formData.append("npsn", npsn.trim());
     formData.append("email", email);
     formData.append("password", password);
 
@@ -226,6 +228,20 @@ export default function RegisterPage() {
                           <input type="text" required value={school} onChange={(e) => setSchool(e.target.value)}
                             className="block w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 focus:bg-white transition-all text-sm"
                             placeholder="SMA Negeri 1 ..." />
+                        </div>
+                      </div>
+
+                      {/* NPSN / Kode Sekolah */}
+                      <div>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <label className="block text-sm font-medium text-slate-700">NPSN / Kode Sekolah</label>
+                          <span className="text-[10px] text-slate-400 font-medium">Bisa angka & huruf (Opsional)</span>
+                        </div>
+                        <div className="relative">
+                          <Building2 size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                          <input type="text" value={npsn} onChange={(e) => setNpsn(e.target.value.toUpperCase())} maxLength={30}
+                            className="block w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 focus:bg-white transition-all text-sm uppercase font-mono font-medium"
+                            placeholder="Contoh: 20101456 atau SMAN1" />
                         </div>
                       </div>
 

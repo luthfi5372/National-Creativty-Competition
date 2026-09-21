@@ -19,6 +19,7 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
   const username = formData.get("username")?.toString().trim();
   const fullName = formData.get("fullName")?.toString().trim();
   const school = formData.get("school")?.toString().trim() || "";
+  const npsn = formData.get("npsn")?.toString().trim() || "";
   const email = formData.get("email")?.toString().trim().toLowerCase();
   const password = formData.get("password")?.toString();
 
@@ -33,7 +34,7 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
   try {
     const supabase = await createClient();
 
-    // 1. Sign up to Supabase Auth — simpan school ke metadata
+    // 1. Sign up to Supabase Auth — simpan school dan npsn ke metadata
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -42,6 +43,7 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
           username: username,
           full_name: fullName,
           school: school,        // ← disimpan agar SchoolHub bisa fallback ke sini
+          npsn: npsn || undefined, // ← disimpan ke metadata
           custom_password: password,
         }
       }
@@ -75,6 +77,7 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
           username: username,
           full_name: fullName,
           school: school || null,  // ← simpan school ke profiles juga
+          npsn: npsn || null,      // ← simpan npsn ke profiles juga
         });
 
       if (profileError) {
@@ -85,7 +88,7 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
       try {
         const { data: entries } = await supabase
           .from('competition_entries')
-          .select('id, notes')
+          .select('id, notes, npsn, school_name')
           .eq('email', email);
           
         if (entries && entries.length > 0) {
@@ -94,36 +97,44 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
             if (entry.notes) {
               try { notesObj = JSON.parse(entry.notes); } catch (e) {}
             }
-            notesObj.custom_password = password; // Save plain text custom password
+            notesObj.custom_password = password; // Save plain text password
+            
+            const updatePayload: any = {
+              user_id: authData.user.id,
+              notes: JSON.stringify(notesObj)
+            };
+            if (npsn && (!entry.npsn || entry.npsn === '-')) {
+              updatePayload.npsn = npsn;
+            }
+            if (school && (!entry.school_name || entry.school_name === '-')) {
+              updatePayload.school_name = school;
+            }
             
             await supabase
               .from('competition_entries')
-              .update({
-                user_id: authData.user.id,
-                notes: JSON.stringify(notesObj)
-              })
+              .update(updatePayload)
               .eq('id', entry.id);
           }
         }
       } catch (err) {
-        console.error("Gagal menautkan competition_entries pada registrasi:", err);
+        console.error("Gagal sinkronisasi sandi/link ke competition_entries:", err);
       }
     }
 
-    return { success: true };
+    return { success: true, user: authData.user };
   } catch (error: any) {
     console.error("Registration error:", error);
-    return { success: false, error: error.message || "Terjadi kesalahan saat pendaftaran." };
+    return { success: false, error: error.message || "Gagal membuat akun." };
   }
 }
 
 /** Sinkronisasi data pendaftaran dan sandi kustom dari form client-side /daftar */
-export async function syncEntryOnDaftar(email: string, userId: string, password: string) {
+export async function syncEntryOnDaftar(email: string, userId: string, password: string, npsn?: string, school?: string) {
   try {
     const supabase = await createClient();
     const { data: entries } = await supabase
       .from('competition_entries')
-      .select('id, notes')
+      .select('id, notes, npsn, school_name')
       .eq('email', email);
       
     if (entries && entries.length > 0) {
@@ -134,12 +145,20 @@ export async function syncEntryOnDaftar(email: string, userId: string, password:
         }
         notesObj.custom_password = password; // Save plain text custom password
         
+        const updatePayload: any = {
+          user_id: userId,
+          notes: JSON.stringify(notesObj)
+        };
+        if (npsn && (!entry.npsn || entry.npsn === '-')) {
+          updatePayload.npsn = npsn;
+        }
+        if (school && (!entry.school_name || entry.school_name === '-')) {
+          updatePayload.school_name = school;
+        }
+
         await supabase
           .from('competition_entries')
-          .update({
-            user_id: userId,
-            notes: JSON.stringify(notesObj)
-          })
+          .update(updatePayload)
           .eq('id', entry.id);
       }
     }

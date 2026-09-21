@@ -896,7 +896,7 @@ function ModernHQDashboardContent() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showSchoolMembers, setShowSchoolMembers] = useState(false);
   const [newParticipant, setNewParticipant] = useState({
-    full_name: "", email: "", nisn: "", school_name: "", province: "", city: "",
+    full_name: "", email: "", nisn: "", npsn: "", school_name: "", province: "", city: "",
     category: "", mentor_name: "", mentor_email: "", mentor_phone: "", phone_number: ""
   });
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -2696,6 +2696,7 @@ function ModernHQDashboardContent() {
         full_name: newParticipant.full_name,
         email: newParticipant.email,
         nisn: newParticipant.nisn,
+        npsn: newParticipant.npsn?.trim() || null,
         school_name: newParticipant.school_name,
         province: newParticipant.province,
         city: newParticipant.city,
@@ -2714,7 +2715,7 @@ function ModernHQDashboardContent() {
       
       showToast("Peserta berhasil ditambahkan ke Buku Induk!", "success");
       setShowAddModal(false);
-      setNewParticipant({full_name: "", email: "", nisn: "", school_name: "", province: "", city: "", category: "", mentor_name: "", mentor_email: "", mentor_phone: "", phone_number: ""});
+      setNewParticipant({full_name: "", email: "", nisn: "", npsn: "", school_name: "", province: "", city: "", category: "", mentor_name: "", mentor_email: "", mentor_phone: "", phone_number: ""});
       
       // Refresh Data
       const { data } = await getAdminCompetitionEntries();
@@ -7213,6 +7214,10 @@ function ModernHQDashboardContent() {
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1 block">Asal Sekolah</label>
                 <input required type="text" value={newParticipant.school_name} onChange={e => setNewParticipant({...newParticipant, school_name: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm bg-slate-50" placeholder="Nama sekolah" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">NPSN / Kode Sekolah (Opsional)</label>
+                <input type="text" value={newParticipant.npsn} onChange={e => setNewParticipant({...newParticipant, npsn: e.target.value.toUpperCase()})} className="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm bg-slate-50 uppercase font-mono" placeholder="Contoh: 20101456 / SMAN1" />
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1 block">Provinsi</label>
