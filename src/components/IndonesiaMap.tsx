@@ -377,8 +377,10 @@ export default function IndonesiaMap() {
             <div className="grid grid-cols-2 gap-4">
               <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 transition-all hover:shadow-xl hover:shadow-indigo-500/5 group cursor-default">
                 <Users size={20} className="text-indigo-600 mb-3 group-hover:scale-110 transition-transform" />
-                <div className="text-2xl font-black text-slate-900">{stats.totalParticipants}</div>
-                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Peserta</div>
+                <div className="text-2xl font-black text-slate-900">
+                  {stats.totalParticipants > 0 ? `${Math.min(100, Math.max(1, Math.round((stats.totalParticipants / 100) * 100)))}%` : "0%"}
+                </div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Target Kuota Terisi</div>
               </div>
               <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 transition-all hover:shadow-xl hover:shadow-indigo-500/5 group cursor-default">
                 <TrendingUp size={20} className="text-indigo-600 mb-3 group-hover:scale-110 transition-transform" />
@@ -409,7 +411,7 @@ export default function IndonesiaMap() {
                       <div key={region} className="space-y-1">
                         <div className="flex justify-between text-[11px] font-bold text-slate-600">
                           <span className="uppercase tracking-tight">{region}</span>
-                          <span>{count} Peserta ({percentage}%)</span>
+                          <span className="text-indigo-600 font-black tracking-wide">{percentage}%</span>
                         </div>
                         <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                           <div 
@@ -428,7 +430,7 @@ export default function IndonesiaMap() {
               </div>
               
               <p className="text-[10px] text-slate-400 font-medium leading-relaxed pt-1.5 border-t border-slate-100">
-                *Data di atas dihitung otomatis secara real-time dari seluruh berkas pendaftaran peserta yang telah berhasil terverifikasi oleh panitia di database pusat.
+                *Persentase di atas dihitung otomatis secara real-time berdasarkan proporsi sebaran pendaftar terverifikasi di database pusat.
               </p>
             </div>
 
@@ -462,28 +464,34 @@ export default function IndonesiaMap() {
               
               {/* Dynamic Province Tooltip */}
               <AnimatePresence>
-                {hoveredInfo && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                    className="absolute bottom-10 right-10 bg-white/90 backdrop-blur-xl border border-indigo-100 p-6 rounded-[2rem] shadow-2xl z-30 min-w-[200px]"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200">
-                        <MapPin size={18} />
+                {hoveredInfo && (() => {
+                  const hoveredPercentage = stats.totalParticipants > 0 
+                    ? Math.round((hoveredInfo.count / stats.totalParticipants) * 100) 
+                    : 0;
+
+                  return (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                      className="absolute bottom-10 right-10 bg-white/90 backdrop-blur-xl border border-indigo-100 p-6 rounded-[2rem] shadow-2xl z-30 min-w-[200px]"
+                    >
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                          <MapPin size={18} />
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Detail Wilayah</div>
+                          <div className="text-sm font-bold text-slate-900">{hoveredInfo.name}</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Detail Wilayah</div>
-                        <div className="text-sm font-bold text-slate-900">{hoveredInfo.name}</div>
+                      <div className="flex items-end gap-2">
+                        <div className="text-3xl font-black text-indigo-600 leading-none">{hoveredPercentage}%</div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Sebaran Pendaftar</div>
                       </div>
-                    </div>
-                    <div className="flex items-end gap-2">
-                      <div className="text-3xl font-black text-slate-900 leading-none">{hoveredInfo.count}</div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pendaftar Terdeteksi</div>
-                    </div>
-                  </motion.div>
-                )}
+                    </motion.div>
+                  );
+                })()}
               </AnimatePresence>
 
               {/* Region Indicators */}
