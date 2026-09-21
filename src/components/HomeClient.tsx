@@ -8,7 +8,6 @@ const Navbar = dynamic(() => import("@/components/Navbar"), { ssr: false });
 const HeroSection = dynamic(() => import("@/components/HeroSection"), { ssr: false });
 const FeatureGrid = dynamic(() => import("@/components/FeatureGrid"), { ssr: false });
 const CategoryCards = dynamic(() => import("@/components/CategoryCards"), { ssr: false });
-const PricingSection = dynamic(() => import("@/components/PricingSection"), { ssr: false });
 const FAQSection = dynamic(() => import("@/components/FAQSection"), { ssr: false });
 const Footer = dynamic(() => import("@/components/Footer"), { ssr: false });
 const ParallaxBackground = dynamic(() => import("@/components/ParallaxBackground"), { ssr: false });
@@ -42,10 +41,6 @@ export default function HomeClient() {
 
           <section id="kategori" className="min-h-screen w-full py-24 flex items-center justify-center">
             <CategoryCards />
-          </section>
-
-          <section className="min-h-screen w-full py-24 flex items-center justify-center">
-            <PricingSection />
           </section>
 
           <section className="min-h-screen w-full py-24 flex items-center justify-center">

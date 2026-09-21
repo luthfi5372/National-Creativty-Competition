@@ -36,7 +36,6 @@ import FeatureGrid from "@/components/FeatureGrid";
 import CategoryCards from "@/components/CategoryCards";
 import Footer from "@/components/Footer";
 
-const PricingSection = dynamic(() => import("@/components/PricingSection"), { ssr: false });
 const FAQSection = dynamic(() => import("@/components/FAQSection"), { ssr: false });
 const TimelineSection = dynamic(() => import("@/components/TimelineSection"), { ssr: false });
 
@@ -69,10 +68,6 @@ export default function Home() {
 
           <section id="kategori" className="min-h-screen w-full py-24 flex items-center justify-center content-auto">
             <CategoryCards />
-          </section>
-
-          <section className="min-h-screen w-full py-24 flex items-center justify-center content-auto">
-            <PricingSection />
           </section>
 
           <section className="min-h-screen w-full py-24 flex items-center justify-center content-auto">
