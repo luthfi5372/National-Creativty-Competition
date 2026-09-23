@@ -132,6 +132,44 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
 export async function syncEntryOnDaftar(email: string, userId: string, password: string, npsn?: string, school?: string) {
   try {
     const supabase = await createClient();
+
+    // ✅ AUTO-CONFIRM EMAIL via admin API agar user bisa langsung login
+    try {
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (serviceRoleKey) {
+        const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+        const adminClient = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        });
+        await adminClient.auth.admin.updateUserById(userId, { email_confirm: true });
+        console.log(`[syncEntryOnDaftar] Auto-confirmed email for user ${userId}`);
+      }
+    } catch (confirmErr) {
+      console.warn('[syncEntryOnDaftar] Auto-confirm failed (non-fatal):', confirmErr);
+    }
+
+    // ✅ BUAT PROFILE jika belum ada
+    try {
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single();
+
+      if (!existingProfile) {
+        await supabase.from('profiles').insert({
+          id: userId,
+          username: email.split('@')[0],
+          full_name: '',
+          school: school || null,
+          npsn: npsn || null,
+        });
+        console.log(`[syncEntryOnDaftar] Created profile for user ${userId}`);
+      }
+    } catch (profileErr) {
+      console.warn('[syncEntryOnDaftar] Profile creation failed (non-fatal):', profileErr);
+    }
+
     const { data: entries } = await supabase
       .from('competition_entries')
       .select('id, notes, npsn, school_name')
