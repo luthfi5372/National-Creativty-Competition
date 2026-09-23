@@ -336,102 +336,135 @@ export async function loginLocalUser(formData: FormData): Promise<AuthResult> {
     let authError = signInResult.error;
 
     if (authError) {
-      // 🚨 FALLBACK: Cek apakah user ada di competition_entries dengan password dari custom_password atau NISN
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      
-      let entry = null;
-      if (serviceRoleKey) {
-        const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-        const serviceClient = createSupabaseClient(supabaseUrl, serviceRoleKey, {
-          auth: { autoRefreshToken: false, persistSession: false }
-        });
 
-        const { data: entries } = await serviceClient
-          .from('competition_entries')
-          .select('*')
-          .eq('email', email);
-
-        if (entries && entries.length > 0) {
-          const matchedEntry = entries.find(e => {
-            let customPw = null;
-            if (e.notes) {
-              try {
-                const obj = typeof e.notes === 'string' ? JSON.parse(e.notes) : e.notes;
-                customPw = obj?.custom_password || obj?.password;
-              } catch (_) {}
+      // ✅ AUTO-HEAL: Jika error "Email not confirmed", coba konfirmasi email dulu lalu login ulang
+      const isEmailNotConfirmed = authError.message?.toLowerCase().includes('email not confirmed') ||
+                                   authError.message?.toLowerCase().includes('not confirmed');
+      if (isEmailNotConfirmed && serviceRoleKey) {
+        try {
+          const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+          const adminClient = createSupabaseClient(supabaseUrl, serviceRoleKey, {
+            auth: { autoRefreshToken: false, persistSession: false }
+          });
+          // Cari user berdasarkan email
+          const { data: listData } = await adminClient.auth.admin.listUsers();
+          const existingUser = listData?.users?.find(u => u.email?.toLowerCase() === email);
+          if (existingUser) {
+            console.log(`[Auth Auto-Confirm] Confirming email for ${email}...`);
+            await adminClient.auth.admin.updateUserById(existingUser.id, {
+              email_confirm: true,
+              password: password.trim(), // Juga sync password
+            });
+            // Coba login ulang
+            const retryResult = await supabase.auth.signInWithPassword({ email, password: password.trim() });
+            if (!retryResult.error && retryResult.data?.user) {
+              authData = retryResult.data;
+              authError = null;
+              console.log(`[Auth Auto-Confirm] Login berhasil setelah konfirmasi email!`);
             }
-            return (customPw && String(customPw).trim() === password.trim()) || 
-                   (e.nisn && String(e.nisn).trim() === password.trim());
+          }
+        } catch (confirmErr) {
+          console.error('[Auth Auto-Confirm] Exception:', confirmErr);
+        }
+      }
+
+      // 🚨 FALLBACK: Cek apakah user ada di competition_entries dengan password dari custom_password atau NISN
+      if (authError) {
+        let entry = null;
+        if (serviceRoleKey) {
+          const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+          const serviceClient = createSupabaseClient(supabaseUrl, serviceRoleKey, {
+            auth: { autoRefreshToken: false, persistSession: false }
           });
 
-          if (matchedEntry) {
-            entry = matchedEntry;
-            console.log(`[Auth Self-Healing] Found matching participant credentials for ${email}. Auto-healing in Supabase Auth...`);
+          const { data: entries } = await serviceClient
+            .from('competition_entries')
+            .select('*')
+            .eq('email', email);
 
-            // Pastikan user ada di auth.users dengan password terbaru
-            try {
-              const { data: listData } = await serviceClient.auth.admin.listUsers();
-              const existingUser = listData?.users?.find(u => u.email?.toLowerCase() === email);
-
-              let finalUid = existingUser?.id;
-              if (existingUser) {
-                await serviceClient.auth.admin.updateUserById(existingUser.id, {
-                  password: password.trim(),
-                  email_confirm: true,
-                  user_metadata: {
-                    full_name: entry.full_name,
-                    username: email.split('@')[0],
-                    nisn: entry.nisn || '',
-                    custom_password: password.trim()
-                  }
-                });
-              } else {
-                const { data: newUser } = await serviceClient.auth.admin.createUser({
-                  email: email,
-                  password: password.trim(),
-                  email_confirm: true,
-                  user_metadata: {
-                    full_name: entry.full_name,
-                    username: email.split('@')[0],
-                    nisn: entry.nisn || '',
-                    custom_password: password.trim()
-                  }
-                });
-                finalUid = newUser?.user?.id;
+          if (entries && entries.length > 0) {
+            const matchedEntry = entries.find(e => {
+              let customPw = null;
+              if (e.notes) {
+                try {
+                  const obj = typeof e.notes === 'string' ? JSON.parse(e.notes) : e.notes;
+                  customPw = obj?.custom_password || obj?.password;
+                } catch (_) {}
               }
+              return (customPw && String(customPw).trim() === password.trim()) || 
+                     (e.nisn && String(e.nisn).trim() === password.trim());
+            });
 
-              if (finalUid) {
-                await serviceClient
-                  .from('competition_entries')
-                  .update({ user_id: finalUid })
-                  .eq('id', entry.id);
+            if (matchedEntry) {
+              entry = matchedEntry;
+              console.log(`[Auth Self-Healing] Found matching participant credentials for ${email}. Auto-healing in Supabase Auth...`);
 
-                await serviceClient
-                  .from('profiles')
-                  .upsert({
-                    id: finalUid,
-                    email: email,
-                    full_name: entry.full_name,
-                    school_name: entry.school_name || '',
-                    nisn: entry.nisn || '',
-                    phone: entry.whatsapp || entry.phone || '',
-                    updated_at: new Date().toISOString()
+              // Pastikan user ada di auth.users dengan password terbaru
+              try {
+                const { data: listData } = await serviceClient.auth.admin.listUsers();
+                const existingUser = listData?.users?.find(u => u.email?.toLowerCase() === email);
+
+                let finalUid = existingUser?.id;
+                if (existingUser) {
+                  await serviceClient.auth.admin.updateUserById(existingUser.id, {
+                    password: password.trim(),
+                    email_confirm: true,
+                    user_metadata: {
+                      full_name: entry.full_name,
+                      username: email.split('@')[0],
+                      nisn: entry.nisn || '',
+                      custom_password: password.trim()
+                    }
                   });
-              }
+                } else {
+                  const { data: newUser } = await serviceClient.auth.admin.createUser({
+                    email: email,
+                    password: password.trim(),
+                    email_confirm: true,
+                    user_metadata: {
+                      full_name: entry.full_name,
+                      username: email.split('@')[0],
+                      nisn: entry.nisn || '',
+                      custom_password: password.trim()
+                    }
+                  });
+                  finalUid = newUser?.user?.id;
+                }
 
-              // Coba login ulang setelah self-healing
-              const retryResult = await supabase.auth.signInWithPassword({
-                email,
-                password: password.trim()
-              });
+                if (finalUid) {
+                  await serviceClient
+                    .from('competition_entries')
+                    .update({ user_id: finalUid })
+                    .eq('id', entry.id);
 
-              if (!retryResult.error) {
-                authData = retryResult.data;
-                authError = null;
+                  await serviceClient
+                    .from('profiles')
+                    .upsert({
+                      id: finalUid,
+                      email: email,
+                      full_name: entry.full_name,
+                      school_name: entry.school_name || '',
+                      nisn: entry.nisn || '',
+                      phone: entry.whatsapp || entry.phone || '',
+                      updated_at: new Date().toISOString()
+                    });
+                }
+
+                // Coba login ulang setelah self-healing
+                const retryResult = await supabase.auth.signInWithPassword({
+                  email,
+                  password: password.trim()
+                });
+
+                if (!retryResult.error) {
+                  authData = retryResult.data;
+                  authError = null;
+                }
+              } catch (healErr) {
+                console.error("[Auth Self-Healing] Exception:", healErr);
               }
-            } catch (healErr) {
-              console.error("[Auth Self-Healing] Exception:", healErr);
             }
           }
         }
