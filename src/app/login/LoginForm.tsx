@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginLocalUser } from "@/app/actions/auth";
+import { createClient } from "@/lib/supabase/client";
 import { Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function LoginForm() {
@@ -21,6 +22,10 @@ export default function LoginForm() {
     setError(null);
 
     const formData = new FormData(e.currentTarget);
+    const emailInput = formData.get("email")?.toString().trim() || "";
+    const password = formData.get("password")?.toString() || "";
+
+    // Step 1: Server action — validasi, self-healing, resolve username → email
     const result = await loginLocalUser(formData);
 
     if (result.success) {
@@ -30,20 +35,39 @@ export default function LoginForm() {
         document.cookie = "ncc_admin_hint=1; path=/; max-age=604800; samesite=lax";
       }
 
-      // 🚀 Alternatif 2: Navigasi Dobrak (Hard Redirect 1 detik)
+      // Step 2: ✅ Sign in dari sisi BROWSER agar Supabase session tersimpan di cookies browser
+      // Server action tidak bisa set browser session dengan benar — ini fix utama!
+      if (!result.isAdmin) {
+        try {
+          const supabase = createClient();
+          const loginEmail = result.resolvedEmail || emailInput;
+          console.log("[Auth-Form] Signing in on browser client with:", loginEmail);
+          const { error: clientError } = await supabase.auth.signInWithPassword({
+            email: loginEmail,
+            password: password,
+          });
+          if (clientError) {
+            console.error("[Auth-Form] Client-side signIn failed:", clientError.message);
+            // Jangan lempar error — server action sudah konfirmasi valid, mungkin tinggal redirect
+          } else {
+            console.log("[Auth-Form] Browser session established successfully!");
+          }
+        } catch (clientErr) {
+          console.error("[Auth-Form] Client signIn exception:", clientErr);
+        }
+      }
+
       setTimeout(() => {
         if (result.isAdmin) {
           window.location.href = '/hq'; 
         } else {
           window.location.href = '/dashboard';
         }
-      }, 1000);
+      }, 500);
     } else {
       const errorMsg = result.error ?? "Terjadi kesalahan.";
       setError(errorMsg);
       setIsLoading(false);
-
-      // 🚨 Alarm Error Aktif (UX Feedback)
       alert("❌ GAGAL MASUK: " + errorMsg);
     }
   };

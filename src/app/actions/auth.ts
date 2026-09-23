@@ -12,6 +12,7 @@ export type AuthResult = {
   success: boolean;
   error?: string;
   isAdmin?: boolean;
+  resolvedEmail?: string; // Email yang sudah di-resolve (untuk login via username)
 };
 
 /** Mendaftarkan user baru ke Supabase Auth & Tabel Profiles */
@@ -487,7 +488,7 @@ export async function loginLocalUser(formData: FormData): Promise<AuthResult> {
       }
     }
 
-    return { success: true, isAdmin };
+    return { success: true, isAdmin, resolvedEmail: email };
   } catch (error: any) {
     console.error("Login error:", error);
     return { success: false, error: error.message || "Email atau kata sandi salah." };
