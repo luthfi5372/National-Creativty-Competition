@@ -121,7 +121,7 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
       }
     }
 
-    return { success: true, user: authData.user };
+    return { success: true };
   } catch (error: any) {
     console.error("Registration error:", error);
     return { success: false, error: error.message || "Gagal membuat akun." };
