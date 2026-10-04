@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShineBorder } from "@/components/ui/ShineBorder";
 import { loginLocalUser } from "@/app/actions/auth";
-import { User, Lock, Eye, EyeOff, Loader2, Trophy, ArrowRight, CheckCircle2, Mic, Microscope, BookOpen, Sparkles, AlertCircle } from "lucide-react";
+import { User, Lock, Eye, EyeOff, Loader2, Trophy, ArrowRight, CheckCircle2, Mic, Microscope, BookOpen, Sparkles, AlertCircle, Mail } from "lucide-react";
 import Link from "next/link";
-import { useLiveStats, GlobalStats } from "@/hooks/useLiveStats";
+import { GlobalStats } from "@/hooks/useLiveStats";
 
 const FLOATING_ITEMS = [
   { label: "Olimpiade MIPA", icon: BookOpen, delay: 0 },
@@ -44,9 +44,7 @@ export default function LoginFormClient({ initialStats = DEFAULT_FALLBACK_STATS 
   const [forgotSuccess, setForgotSuccess] = useState(false);
   const router = useRouter();
 
-  // Initialize with real-time live statistics from database
-  const { stats: liveStats } = useLiveStats();
-  const activeStats = liveStats || initialStats;
+  // Statistik peserta tidak lagi ditampilkan di halaman login (tidak perlu polling)
 
   const handleForgotPassword = async () => {
     const targetEmail = forgotEmail.trim() || email.trim();
@@ -109,7 +107,8 @@ export default function LoginFormClient({ initialStats = DEFAULT_FALLBACK_STATS 
         const { createClient: createBrowserClient } = await import("@/lib/supabase/client");
         const supabaseBrowser = createBrowserClient();
         
-        let authEmail = activeEmail;
+        // ✅ Gunakan email hasil resolve dari server (penting untuk login via USERNAME)
+        let authEmail = result.resolvedEmail || activeEmail;
         let authPassword = password.trim();
         
         if (authEmail === 'admin') {
@@ -267,36 +266,7 @@ export default function LoginFormClient({ initialStats = DEFAULT_FALLBACK_STATS 
             Platform resmi pendaftaran dan pengelolaan peserta kompetisi kreativitas nasional ke-13.
           </motion.p>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-3 mb-10 min-h-[96px]">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="bg-white/10 border border-white/10 rounded-2xl p-4 text-center min-h-[96px] flex flex-col justify-center"
-            >
-              <div className="text-2xl font-extrabold">{activeStats.totalParticipants}</div>
-              <div className="text-xs text-indigo-200 mt-1">Peserta</div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="bg-white/10 border border-white/10 rounded-2xl p-4 text-center min-h-[96px] flex flex-col justify-center"
-            >
-              <div className="text-2xl font-extrabold">{activeStats.provinces}</div>
-              <div className="text-xs text-indigo-200 mt-1">Provinsi</div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
-              className="bg-white/10 border border-white/10 rounded-2xl p-4 text-center min-h-[96px] flex flex-col justify-center"
-            >
-              <div className="text-2xl font-extrabold">{activeStats.categories}</div>
-              <div className="text-xs text-indigo-200 mt-1">Kategori</div>
-            </motion.div>
-          </div>
+          {/* Stats dihapus sesuai permintaan — jumlah peserta tidak ditampilkan di halaman login */}
 
           <div className="flex flex-col gap-2">
             {FLOATING_ITEMS.map((item) => (

@@ -305,21 +305,39 @@ export async function loginLocalUser(formData: FormData): Promise<AuthResult> {
         auth: { autoRefreshToken: false, persistSession: false }
       });
 
-      // 1. Coba cari di profiles (Bypass RLS)
-      const { data: profile } = await serviceClient.from('profiles').select('id').eq('username', loginInput).single();
-      if (profile) {
-        // 2. Coba cari email di competition_entries menggunakan user_id dari profiles (Bypass RLS)
-        const { data: entry } = await serviceClient.from('competition_entries').select('email').eq('user_id', profile.id).single();
-        if (entry && entry.email) {
-          email = entry.email.toLowerCase();
-          console.log(`[Auth] Resolved username '${loginInput}' to email '${email}' via user_id`);
-        } else {
-          // Fallback: cari di notes (barangkali disimpan di sana), atau kembalikan error
-          return { success: false, error: "Username ditemukan tetapi email tidak terhubung. Gunakan email untuk login." };
-        }
-      } else {
-        return { success: false, error: "Username tidak ditemukan." };
+      // 1. Cari profil berdasarkan username (case-insensitive, karena input sudah di-lowercase)
+      const { data: profiles } = await serviceClient
+        .from('profiles')
+        .select('id')
+        .ilike('username', loginInput)
+        .limit(5);
+
+      let resolved: string | null = null;
+
+      // 2. Ambil email langsung dari auth.users (paling akurat)
+      for (const p of profiles || []) {
+        const { data: u } = await serviceClient.auth.admin.getUserById(p.id);
+        if (u?.user?.email) { resolved = u.user.email.toLowerCase(); break; }
+        // Fallback: email dari competition_entries yang terhubung
+        const { data: entries } = await serviceClient
+          .from('competition_entries').select('email').eq('user_id', p.id).not('email', 'is', null).limit(1);
+        if (entries && entries[0]?.email) { resolved = entries[0].email.toLowerCase(); break; }
       }
+
+      // 3. Fallback terakhir: cari di user_metadata.username pada auth.users
+      if (!resolved) {
+        const { data: listData } = await serviceClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+        const match = listData?.users?.find(u =>
+          String(u.user_metadata?.username || '').toLowerCase() === loginInput
+        );
+        if (match?.email) resolved = match.email.toLowerCase();
+      }
+
+      if (!resolved) {
+        return { success: false, error: "Username tidak ditemukan. Coba login menggunakan email." };
+      }
+      email = resolved;
+      console.log(`[Auth] Resolved username '${loginInput}' → '${email}'`);
     }
 
     let signInResult = null;
@@ -349,7 +367,7 @@ export async function loginLocalUser(formData: FormData): Promise<AuthResult> {
             auth: { autoRefreshToken: false, persistSession: false }
           });
           // Cari user berdasarkan email
-          const { data: listData } = await adminClient.auth.admin.listUsers();
+          const { data: listData } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
           const existingUser = listData?.users?.find(u => u.email?.toLowerCase() === email);
           if (existingUser) {
             console.log(`[Auth Auto-Confirm] Confirming email for ${email}...`);
@@ -403,7 +421,7 @@ export async function loginLocalUser(formData: FormData): Promise<AuthResult> {
 
               // Pastikan user ada di auth.users dengan password terbaru
               try {
-                const { data: listData } = await serviceClient.auth.admin.listUsers();
+                const { data: listData } = await serviceClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
                 const existingUser = listData?.users?.find(u => u.email?.toLowerCase() === email);
 
                 let finalUid = existingUser?.id;
@@ -704,7 +722,7 @@ export async function getUnregisteredUsers() {
     let authUsers: any[] = [];
     if (serviceRoleKey) {
       try {
-        const { data: authData, error: authError } = await client.auth.admin.listUsers();
+        const { data: authData, error: authError } = await client.auth.admin.listUsers({ page: 1, perPage: 1000 });
         if (!authError && authData?.users) {
           authUsers = authData.users;
         }
