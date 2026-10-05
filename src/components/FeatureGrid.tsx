@@ -153,8 +153,12 @@ export default function FeatureGrid() {
                transition={{ duration: 0.6, delay: 0.2 }}
                className="w-full aspect-[4/3] bg-gradient-to-br from-indigo-600 to-purple-600 border border-indigo-400 shadow-2xl shadow-indigo-600/30 rounded-2xl p-8 flex flex-col items-center justify-center text-center relative z-20"
             >
-              <div className="w-20 h-20 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center mb-6">
-                <Medal size={40} className="text-amber-300 drop-shadow-lg" />
+              <div className="w-24 h-24 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center mb-6 p-2.5 shadow-2xl shadow-indigo-900/40">
+                <img 
+                  src="/logo-ncc.png" 
+                  alt="Logo NCC 13th" 
+                  className="w-full h-full object-contain drop-shadow-lg" 
+                />
               </div>
               <h4 className="text-2xl sm:text-3xl font-bold text-white mb-2 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>Piala Bergilir</h4>
               <p className="text-indigo-100 font-medium text-sm sm:text-base">Kementerian Agama RI & Gubernur Jatim</p>

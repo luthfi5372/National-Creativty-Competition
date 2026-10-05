@@ -79,9 +79,9 @@ export default function RegisterPage() {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="w-20 h-20 bg-white/10 border border-white/20 rounded-3xl flex items-center justify-center mb-8 shadow-2xl"
+            className="w-28 h-20 bg-white/10 border border-white/20 backdrop-blur-md rounded-3xl flex items-center justify-center mb-8 p-2.5 shadow-2xl"
           >
-            <Trophy size={38} className="text-yellow-300 drop-shadow-lg" />
+            <img src="/logo-ncc.png" alt="NCC Logo" className="w-full h-full object-contain drop-shadow-md" />
           </motion.div>
 
           <motion.h1
@@ -132,8 +132,8 @@ export default function RegisterPage() {
         >
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-11 h-11 bg-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-200">
-              <Trophy size={20} className="text-yellow-300" />
+            <div className="w-14 h-12 bg-white rounded-2xl border border-purple-100 flex items-center justify-center p-1.5 shadow-md shadow-purple-100">
+              <img src="/logo-ncc.png" alt="NCC Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <div className="font-bold text-slate-900 text-sm">NCC 13th</div>

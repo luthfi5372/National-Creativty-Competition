@@ -22,8 +22,8 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-lg text-white">
-                {settings?.site_brand_name?.[0] || "N"}
+              <div className="h-10 w-auto flex items-center justify-center shrink-0">
+                <img src="/logo-ncc.png" alt="Logo NCC 13th" className="h-10 w-auto object-contain drop-shadow-sm" />
               </div>
               <div>
                 <h3

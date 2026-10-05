@@ -244,9 +244,9 @@ export default function LoginFormClient({ initialStats = DEFAULT_FALLBACK_STATS 
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="w-20 h-20 bg-indigo-600 border border-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center mb-8 shadow-2xl"
+            className="w-28 h-20 bg-white/10 border border-white/20 backdrop-blur-md rounded-3xl flex items-center justify-center mb-8 p-2.5 shadow-2xl"
           >
-            <span className="font-bold text-4xl text-white">N</span>
+            <img src="/logo-ncc.png" alt="NCC Logo" className="w-full h-full object-contain drop-shadow-md" />
           </motion.div>
 
           <motion.h1
@@ -297,8 +297,8 @@ export default function LoginFormClient({ initialStats = DEFAULT_FALLBACK_STATS 
         >
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-11 h-11 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
-              <span className="font-bold text-xl text-white">N</span>
+            <div className="w-14 h-12 bg-white rounded-2xl border border-indigo-100 flex items-center justify-center p-1.5 shadow-md">
+              <img src="/logo-ncc.png" alt="NCC Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <div className="font-bold text-slate-900 text-sm">NCC 13th</div>

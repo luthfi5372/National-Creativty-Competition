@@ -90,16 +90,25 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-1">
           {/* Brand */}
           <MagneticWrapper>
-            <div className="px-4 py-2 mr-2 flex items-center gap-2 cursor-pointer transition-transform">
-                <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-sm text-white shadow-sm">
-                  {settings?.site_brand_name?.[0] || "N"}
+            <div className="px-4 py-2 mr-2 flex items-center gap-2.5 cursor-pointer transition-transform">
+                <div className="relative h-9 flex items-center justify-center shrink-0">
+                  <img 
+                    src="/logo-ncc.png" 
+                    alt="Logo NCC 13th" 
+                    className="h-8 sm:h-9 w-auto object-contain drop-shadow-sm transition-transform hover:scale-105" 
+                  />
                 </div>
-                <span
-                  className="font-bold text-base tracking-wide text-slate-900"
-                  style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))" }}
-                >
-                  {settings?.site_brand_name || "NCC"}
-                </span>
+                <div className="flex flex-col text-left leading-tight">
+                  <span
+                    className="font-black text-sm tracking-wide text-slate-900"
+                    style={{ fontFamily: "var(--font-display, var(--font-space-grotesk))" }}
+                  >
+                    NCC
+                  </span>
+                  <span className="text-[10px] font-black text-indigo-600 tracking-wider">
+                    13th
+                  </span>
+                </div>
             </div>
           </MagneticWrapper>
 
@@ -178,12 +187,19 @@ export default function Navbar() {
         {/* Mobile nav toggle */}
         <div className="flex md:hidden items-center justify-between px-3 py-1 min-w-[280px]">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-xs text-white">
-              {settings?.site_brand_name?.[0] || "N"}
+            <img 
+              src="/logo-ncc.png" 
+              alt="Logo NCC 13th" 
+              className="h-7 w-auto object-contain" 
+            />
+            <div className="flex flex-col text-left leading-tight">
+              <span className="font-black text-xs text-slate-900" style={{ fontFamily: "var(--font-display)" }}>
+                NCC
+              </span>
+              <span className="text-[9px] font-black text-indigo-600 tracking-wider">
+                13th
+              </span>
             </div>
-            <span className="font-bold text-sm text-slate-900" style={{ fontFamily: "var(--font-display)" }}>
-              {settings?.site_brand_name || "NCC"}
-            </span>
           </div>
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
