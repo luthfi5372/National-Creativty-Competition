@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
-import { syncEntryOnDaftar } from "@/app/actions/auth";
+import { registerParticipantAction } from "@/app/actions/auth";
 
 export default function DaftarPage() {
   const [formData, setFormData] = useState({
@@ -83,26 +83,18 @@ export default function DaftarPage() {
 
     setLoading(true);
     try {
-      // 2. Tembakkan Data ke Supabase Auth
-      const { data, error: authError } = await supabase.auth.signUp({
+      // 2. Tembakkan ke Server Action (Bebas Email Rate Limit Supabase)
+      const res = await registerParticipantAction({
+        username: formData.username,
+        fullName: formData.fullName,
         email: formData.email,
         password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-            username: formData.username,
-            npsn: formData.npsn.trim(),
-            school: formData.school,
-            custom_password: formData.password, // Save plain text password
-          }
-        }
+        npsn: formData.npsn,
+        school: formData.school,
       });
 
-      if (authError) throw authError;
-
-      // 2.b Link competition_entries and sync custom password in database immediately
-      if (data?.user) {
-        await syncEntryOnDaftar(formData.email, data.user.id, formData.password, formData.npsn.trim(), formData.school);
+      if (!res.success) {
+        throw new Error(res.error || "Gagal membuat akun.");
       }
 
       // 3. Tampilkan Efek Sukses Premium

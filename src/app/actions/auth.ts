@@ -15,14 +15,26 @@ export type AuthResult = {
   resolvedEmail?: string; // Email yang sudah di-resolve (untuk login via username)
 };
 
-/** Mendaftarkan user baru ke Supabase Auth & Tabel Profiles */
-export async function registerLocalUser(formData: FormData): Promise<AuthResult> {
-  const username = formData.get("username")?.toString().trim();
-  const fullName = formData.get("fullName")?.toString().trim();
-  const school = formData.get("school")?.toString().trim() || "";
-  const npsn = formData.get("npsn")?.toString().trim() || "";
-  const email = formData.get("email")?.toString().trim().toLowerCase();
-  const password = formData.get("password")?.toString();
+export type RegisterParticipantPayload = {
+  username: string;
+  fullName: string;
+  email: string;
+  password: string;
+  npsn?: string;
+  school?: string;
+};
+
+/**
+ * Mendaftarkan peserta baru tanpa terkena email rate limit Supabase
+ * Menggunakan admin.createUser({ email_confirm: true }) agar akun langsung aktif tanpa memicu pengiriman email
+ */
+export async function registerParticipantAction(payload: RegisterParticipantPayload): Promise<AuthResult> {
+  const username = payload.username?.trim();
+  const fullName = payload.fullName?.trim();
+  const school = payload.school?.trim() || "";
+  const npsn = payload.npsn?.trim() || "";
+  const email = payload.email?.trim().toLowerCase();
+  const password = payload.password;
 
   if (!username || !fullName || !email || !password) {
     return { success: false, error: "Semua kolom wajib diisi." };
@@ -33,61 +45,68 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
   }
 
   try {
-    const supabase = await createClient();
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://afwuyizfsoevcffnhfbk.supabase.co";
 
-    // 1. Sign up to Supabase Auth — simpan school dan npsn ke metadata
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
+    // METODE UTAMA: Gunakan Service Role Key untuk bypass pengiriman email (100% bebas rate limit)
+    if (serviceRoleKey) {
+      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+      const adminClient = createSupabaseClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+      });
+
+      // 1. Cek apakah username sudah dipakai di profiles
+      const { data: existingProfile } = await adminClient
+        .from('profiles')
+        .select('username')
+        .ilike('username', username)
+        .maybeSingle();
+
+      if (existingProfile) {
+        return { success: false, error: `Username "${username}" sudah digunakan. Silakan gunakan username lain.` };
+      }
+
+      // 2. Buat akun di Supabase Auth via Admin API (email_confirm: true tidak memicu pengiriman email verifikasi)
+      const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+        email: email,
+        password: password,
+        email_confirm: true, // ✅ Langsung diverifikasi, tidak kirim email confirmation, tidak terkena limit!
+        user_metadata: {
           username: username,
           full_name: fullName,
-          school: school,        // ← disimpan agar SchoolHub bisa fallback ke sini
-          npsn: npsn || undefined, // ← disimpan ke metadata
+          school: school,
+          npsn: npsn || undefined,
           custom_password: password,
         }
-      }
-    });
+      });
 
-    if (authError) throw authError;
-
-    // 2. Create profile in profiles table & Auto-confirm Email
-    if (authData.user) {
-      try {
-        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        if (serviceRoleKey) {
-          const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-          const adminClient = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {
-            auth: { autoRefreshToken: false, persistSession: false }
-          });
-          await adminClient.auth.admin.updateUserById(authData.user.id, { email_confirm: true });
+      if (authError) {
+        // Terjemahkan error umum dari Supabase agar ramah pengguna
+        if (authError.message.toLowerCase().includes("already registered") || authError.message.toLowerCase().includes("unique")) {
+          return { success: false, error: "Alamat email ini sudah terdaftar. Silakan langsung masuk di halaman Login." };
         }
-      } catch (err) {
-        console.warn("Auto-confirm warning:", err);
+        if (authError.message.toLowerCase().includes("rate limit")) {
+          return { success: false, error: "Batas pendaftaran tercapai. Silakan coba lagi beberapa saat lagi." };
+        }
+        throw authError;
       }
 
-      // Sync cookie so they can access dashboard immediately if logged in
-      const cookieStore = await cookies();
-      cookieStore.set("ncc_hint", "1", { path: "/", maxAge: 60 * 60 * 24 * 7 });
+      const userId = authData.user.id;
 
-      const { error: profileError } = await supabase
+      // 3. Simpan / perbarui tabel profiles
+      await adminClient
         .from('profiles')
-        .insert({
-          id: authData.user.id,
+        .upsert({
+          id: userId,
           username: username,
           full_name: fullName,
-          school: school || null,  // ← simpan school ke profiles juga
-          npsn: npsn || null,      // ← simpan npsn ke profiles juga
+          school: school || null,
+          npsn: npsn || null,
         });
 
-      if (profileError) {
-        console.error("Profile creation error:", profileError);
-      }
-
-      // Automatically link pre-existing competition_entries matching this email
+      // 4. Sinkronisasi ke competition_entries jika ada pendaftaran sebelumnya yang cocok
       try {
-        const { data: entries } = await supabase
+        const { data: entries } = await adminClient
           .from('competition_entries')
           .select('id, notes, npsn, school_name')
           .eq('email', email);
@@ -98,10 +117,10 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
             if (entry.notes) {
               try { notesObj = JSON.parse(entry.notes); } catch (e) {}
             }
-            notesObj.custom_password = password; // Save plain text password
+            notesObj.custom_password = password;
             
             const updatePayload: any = {
-              user_id: authData.user.id,
+              user_id: userId,
               notes: JSON.stringify(notesObj)
             };
             if (npsn && (!entry.npsn || entry.npsn === '-')) {
@@ -111,7 +130,7 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
               updatePayload.school_name = school;
             }
             
-            await supabase
+            await adminClient
               .from('competition_entries')
               .update(updatePayload)
               .eq('id', entry.id);
@@ -120,6 +139,50 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
       } catch (err) {
         console.error("Gagal sinkronisasi sandi/link ke competition_entries:", err);
       }
+
+      // 5. Set session hint cookie
+      try {
+        const cookieStore = await cookies();
+        cookieStore.set("ncc_hint", "1", { path: "/", maxAge: 60 * 60 * 24 * 7 });
+      } catch (e) {}
+
+      return { success: true };
+    }
+
+    // FALLBACK jika service role key tidak ada (menggunakan signUp biasa)
+    const supabase = await createClient();
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          username: username,
+          full_name: fullName,
+          school: school,
+          npsn: npsn || undefined,
+          custom_password: password,
+        }
+      }
+    });
+
+    if (authError) {
+      if (authError.message.toLowerCase().includes("rate limit")) {
+        return {
+          success: false,
+          error: "Batas pengiriman email Supabase tercapai (rate limit). Silakan hubungi panitia atau nonaktifkan konfirmasi email di Supabase."
+        };
+      }
+      throw authError;
+    }
+
+    if (authData.user) {
+      await supabase.from('profiles').upsert({
+        id: authData.user.id,
+        username: username,
+        full_name: fullName,
+        school: school || null,
+        npsn: npsn || null,
+      });
     }
 
     return { success: true };
@@ -127,6 +190,18 @@ export async function registerLocalUser(formData: FormData): Promise<AuthResult>
     console.error("Registration error:", error);
     return { success: false, error: error.message || "Gagal membuat akun." };
   }
+}
+
+/** Mendaftarkan user baru ke Supabase Auth & Tabel Profiles dari FormData */
+export async function registerLocalUser(formData: FormData): Promise<AuthResult> {
+  const username = formData.get("username")?.toString().trim() || "";
+  const fullName = formData.get("fullName")?.toString().trim() || "";
+  const school = formData.get("school")?.toString().trim() || "";
+  const npsn = formData.get("npsn")?.toString().trim() || "";
+  const email = formData.get("email")?.toString().trim().toLowerCase() || "";
+  const password = formData.get("password")?.toString() || "";
+
+  return registerParticipantAction({ username, fullName, school, npsn, email, password });
 }
 
 /** Sinkronisasi data pendaftaran dan sandi kustom dari form client-side /daftar */
