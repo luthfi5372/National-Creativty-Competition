@@ -28,14 +28,14 @@ const TIMELINE_DATA = [
     waves: [
       { label: "Gelombang I", items: [
         { icon: FileText, label: "Pendaftaran", start: "", end: "" },
-        { icon: Brain, label: "Seleksi 1", start: "", end: "" },
-        { icon: Zap, label: "Seleksi 2", start: "", end: "" },
+        { icon: Brain, label: "Simulasi", start: "", end: "" },
+        { icon: Zap, label: "Seleksi tahap 1", start: "", end: "" },
         { icon: Star, label: "Pengumuman Tahap I", start: "", end: "" }
       ]},
       { label: "Gelombang II", items: [
         { icon: FileText, label: "Pendaftaran", start: "", end: "" },
         { icon: MonitorPlay, label: "Simulasi", start: "", end: "" },
-        { icon: Zap, label: "Seleksi", start: "", end: "" },
+        { icon: Zap, label: "Seleksi tahap 1", start: "", end: "" },
         { icon: Megaphone, label: "Pengumuman", start: "", end: "" }
       ]}
     ]
