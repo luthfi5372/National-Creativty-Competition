@@ -1293,6 +1293,38 @@ export async function getSchoolMessages(schoolName: string, npsn?: string) {
   }
 }
 
+/** Menghapus pesan dummy/test admin di school_messages secara permanen (RLS bypass) */
+export async function clearTestSchoolMessages() {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    // 1. Hapus pesan dari sender hq-admin atau Markas Besar
+    await client
+      .from('school_messages')
+      .delete()
+      .or("sender_id.eq.hq-admin,sender_id.eq.admin1,sender_name.ilike.%Markas Besar%");
+
+    // 2. Hapus pesan berdasarkan isi template cepat
+    await client
+      .from('school_messages')
+      .delete()
+      .or("message.ilike.%Gelombang Pendaftaran sudah diaktifkan%,message.ilike.%Harap lengkapi biodata pendaftaran%,message.ilike.%Karya Anda telah berhasil diverifikasi%,message.eq.ww");
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception clearTestSchoolMessages:", err);
+    return { success: false, error: err.message };
+  }
+}
+
 /** Mengambil setting portal secara aman dari server (RLS bypass) */
 export async function getPortalSettings() {
   try {

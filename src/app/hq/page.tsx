@@ -6491,10 +6491,9 @@ function ModernHQDashboardContent() {
                         ⚡ Balas Cepat:
                       </span>
                       {[
-                        "Gelombang Pendaftaran sudah diaktifkan kembali. Silakan cek dashboard Anda! 🚀",
-                        "Karya Anda telah berhasil diverifikasi oleh Panitia. Selamat berjuang! ✨",
-                        "Harap lengkapi biodata pendaftaran dan unggah bukti pembayaran di menu pendaftaran. 🙏",
-                        "Ada yang bisa kami bantu mengenai kendala teknis atau materi kompetisi? 💬"
+                        "Halo! Ada yang bisa kami bantu seputar kompetisi? 💬",
+                        "Baik, pertanyaan Anda sedang kami koordinasikan dengan panitia.",
+                        "Terima kasih atas informasinya. 🙏"
                       ].map((text, idx) => (
                         <button
                           key={idx}

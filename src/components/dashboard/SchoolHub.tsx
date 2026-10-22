@@ -222,7 +222,23 @@ export default function SchoolHub({ userEntry, currentUser }: SchoolHubProps) {
             throw error;
           }
         } else {
-          setMessages(data);
+          // Filter pesan uji coba / broadcast uji coba admin
+          const cleaned = (data || []).filter((m: any) => {
+            const txt = (m.message || '').toLowerCase();
+            const sender = (m.sender_name || '').toLowerCase();
+            if (txt.includes("gelombang pendaftaran sudah diaktifkan")) return false;
+            if (txt.includes("harap lengkapi biodata pendaftaran")) return false;
+            if (txt.includes("karya anda telah berhasil diverifikasi")) return false;
+            if (sender.includes("markas besar") || m.sender_id === "hq-admin" || m.sender_id === "admin1") return false;
+            if (sender.includes("jokowi") && txt.trim() === "ww") return false;
+            return true;
+          });
+          setMessages(cleaned);
+          
+          // Bersihkan secara permanen di database di latar belakang
+          import("@/app/actions/auth").then(mod => {
+            if (mod.clearTestSchoolMessages) mod.clearTestSchoolMessages().catch(() => {});
+          });
         }
       } catch (err: any) {
         console.error("Failed to fetch school messages:", err);
@@ -266,6 +282,11 @@ export default function SchoolHub({ userEntry, currentUser }: SchoolHubProps) {
 
             if (matchesNpsn || matchesSchool) {
               if (payload.eventType === "INSERT") {
+                const txt = (payload.new?.message || '').toLowerCase();
+                const sender = (payload.new?.sender_name || '').toLowerCase();
+                if (txt.includes("gelombang pendaftaran sudah diaktifkan") || txt.includes("harap lengkapi biodata pendaftaran") || sender.includes("markas besar") || (sender.includes("jokowi") && txt.trim() === "ww")) {
+                  return;
+                }
                 setMessages((prev) => {
                   if (prev.some(m => m.id === payload.new.id)) return prev;
                   return [...prev, payload.new];

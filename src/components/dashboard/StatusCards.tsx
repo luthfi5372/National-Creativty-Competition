@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AlertCircle, CheckCircle2, Clock, User, IdCard, ImageIcon, FolderOpen, BookOpen, MessageCircle, Target, Sparkles, ChevronRight, Ticket, Copy, Check, Loader2, Upload, Lock } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, User, IdCard, ImageIcon, FolderOpen, BookOpen, MessageCircle, Target, Sparkles, ChevronRight, Ticket, Copy, Check, Loader2, Upload, Lock, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateTicketCode } from "@/lib/utils";
@@ -41,6 +41,7 @@ export default function StatusCards({
   const [isEditingSubmission, setIsEditingSubmission] = useState(false);
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
   const [isUploadingPayment, setIsUploadingPayment] = useState(false);
+  const [showJuknisModal, setShowJuknisModal] = useState(false);
 
   // 💳 DYNAMIC PAYMENT DETAILS CONFIG
   const [dynamicPaymentConfig, setDynamicPaymentConfig] = useState<any>({
@@ -53,9 +54,11 @@ export default function StatusCards({
     description: "Untuk mengaktifkan kepesertaan Anda di cabang {category}, silakan lakukan transfer administrasi pendaftaran:"
   });
 
-  // 💬 DYNAMIC WHATSAPP GROUP LINKS
+  // 💬 DYNAMIC WHATSAPP GROUP LINKS (Default ke Grup Resmi Peserta NCC 13th)
+  const OFFICIAL_WA_GROUP = "https://chat.whatsapp.com/GL9taBFa9j2EfOutxQuDjD?s=ci&p=a&mlu=4";
   const [dynamicGroupLinks, setDynamicGroupLinks] = useState<Record<string, string>>({
-    general: "",
+    general: OFFICIAL_WA_GROUP,
+    general_label: "Grup WhatsApp Peserta",
     mipa: "",
     lkti: "",
     speech: "",
@@ -74,7 +77,12 @@ export default function StatusCards({
           setDynamicPaymentConfig(pRes.data);
         }
         if (gRes && gRes.data) {
-          setDynamicGroupLinks(gRes.data);
+          setDynamicGroupLinks(prev => ({
+            ...prev,
+            ...gRes.data,
+            general: gRes.data.general || OFFICIAL_WA_GROUP,
+            general_label: gRes.data.general_label || "Grup WhatsApp Peserta"
+          }));
         }
       } catch (err) {
         console.error("Gagal load payment/group config:", err);
@@ -1142,17 +1150,20 @@ export default function StatusCards({
           const juknisUrl = getJuknisUrl();
           const juknisLabel = userEntry?.competition_type || userEntry?.category || 'Lomba';
 
-          // Map kategori lomba ke CP WhatsApp (dari Juknis resmi) — bisa lebih dari 1 CP
+          // Map kategori lomba ke CP WhatsApp (dari Juknis resmi) — SELALU ADA CP (tidak pernah kosongan / #)
           const getWhatsAppCPs = (): { name: string; phone: string }[] => {
             const cat = (userEntry?.competition_type || userEntry?.category || '').toLowerCase();
-            if (cat.includes('lkti')) return [{ name: 'Rizki Yudha Sentika, M.Pd', phone: '6285746460644' }];
+            if (cat.includes('lkti')) return [{ name: 'Rizki Yudha Sentika, M.Pd (CP LKTI)', phone: '6285746460644' }];
             if (cat.includes('mipa') || cat.includes('olimpiade')) return [
-              { name: 'Yudha Kristiawan, M.Pd', phone: '6285736274033' },
-              { name: 'Putri Setyaningati N, S.Pd', phone: '6285730034516' },
+              { name: 'Yudha Kristiawan, M.Pd (CP MIPA)', phone: '6285736274033' },
+              { name: 'Putri Setyaningati N, S.Pd (CP MIPA)', phone: '6285730034516' },
             ];
-            if (cat.includes('speech')) return [{ name: 'Rizkia Putri Perdana, S.Pd', phone: '6285649603868' }];
-            if (cat.includes('mtq')) return [{ name: 'Herina Jum\'atin Ayuningrum, S.Pd.I. M.Pd', phone: '6281233882731' }];
-            return [];
+            if (cat.includes('speech')) return [{ name: 'Rizkia Putri Perdana, S.Pd (CP Speech)', phone: '6285649603868' }];
+            if (cat.includes('mtq')) return [{ name: 'Herina Jum\'atin Ayuningrum, M.Pd (CP MTQ)', phone: '6281233882731' }];
+            // Default untuk peserta yang belum memilih lomba / belum lengkapi data: selalu aktif!
+            return [
+              { name: 'Rizki Yudha Sentika, M.Pd (Panitia NCC)', phone: '6285746460644' }
+            ];
           };
           const cpList = getWhatsAppCPs();
 
@@ -1178,46 +1189,77 @@ export default function StatusCards({
             }))
             .filter(g => g.scope === 'all' || g.scope === participantScope);
 
-          const makeWaUrl = (phone: string) =>
-            `https://wa.me/${phone}?text=${encodeURIComponent(`Assalamualaikum, saya peserta ${juknisLabel} NCC 13th. Saya ingin bertanya mengenai informasi lomba.`)}`;
+          const makeWaUrl = (phone: string) => {
+            const msg = userEntry?.competition_type
+              ? `Assalamualaikum, saya peserta ${juknisLabel} NCC 13th. Saya ingin bertanya mengenai informasi lomba.`
+              : `Assalamualaikum Panitia NCC 13th, saya ingin bertanya seputar pendaftaran & kompetisi NCC 13th.`;
+            return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+          };
+
+          const defaultWaGroup = dynamicGroupLinks?.general || OFFICIAL_WA_GROUP;
+
+          // Daftar grup WA yang akan ditampilkan (SELALU MUNCUL minimal grup resmi umum)
+          const waGroupItems = matchedGroups.length > 0
+            ? matchedGroups.map(g => ({
+                label: g.label || "Grup WhatsApp Peserta",
+                sub: "Bergabung ke grup WhatsApp resmi peserta",
+                icon: MessageCircle,
+                color: "emerald",
+                href: g.url || defaultWaGroup,
+                isJuknis: false
+              }))
+            : [{
+                label: "Grup WhatsApp Peserta",
+                sub: "Grup resmi koordinasi & info NCC 13th",
+                icon: MessageCircle,
+                color: "emerald",
+                href: defaultWaGroup,
+                isJuknis: false
+              }];
 
           const items = [
             { 
               label: "Buku Panduan", 
-              sub: juknisUrl ? `Juknis ${juknisLabel} (PDF)` : "Buku Panduan & Juknis Semua Lomba", 
+              sub: juknisUrl ? `Juknis ${juknisLabel} (PDF)` : "Buku Panduan & Juknis Semua Lomba (PDF)", 
               icon: BookOpen, 
               color: "blue",
-              href: juknisUrl || "/#kategori"
+              href: juknisUrl || "#",
+              isJuknis: true
             },
-            // Tampilkan semua grup WA yang match scope peserta
-            ...matchedGroups.map(g => ({
-              label: g.label,
-              sub: "Bergabung ke grup WhatsApp resmi",
+            // 🔥 GRUP WHATSAPP PESERTA SELALU MUNCUL BAIK SUDAH ATAU BELUM LENGKAPI DATA!
+            ...waGroupItems,
+            { 
+              label: "Twibbon Resmi", 
+              sub: "Pasang twibbon NCC 13th sekarang!", 
+              icon: ImageIcon, 
+              color: "purple", 
+              href: "https://twb.nz/nationalcreativitycompetition",
+              isJuknis: false
+            },
+            // 🔥 CP PANITIA SELALU AKTIF KE WHATSAPP (TIDAK PERNAH #)
+            ...cpList.map((cp, idx) => ({
+              label: cpList.length > 1 ? `Hubungi Panitia ${idx + 1}` : "Hubungi Panitia",
+              sub: `Bantuan via WhatsApp (${cp.name.split(' (')[0]})`,
               icon: MessageCircle,
-              color: "emerald",
-              href: g.url,
-            })),
-            { label: "Twibbon Resmi", sub: "Pasang twibbon NCC 13th sekarang!", icon: ImageIcon, color: "purple", href: "https://twb.nz/nationalcreativitycompetition" },
-            // Generate 1 atau lebih tombol CP sesuai jumlah CP di juknis
-            ...(cpList.length > 0
-              ? cpList.map((cp, idx) => ({
-                  label: cpList.length > 1 ? `Hubungi Panitia ${idx + 1}` : "Hubungi Panitia",
-                  sub: `CP: ${cp.name}`,
-                  icon: MessageCircle,
-                  color: "green",
-                  href: makeWaUrl(cp.phone),
-                }))
-              : [{ label: "Hubungi Panitia", sub: "Bantuan via WhatsApp", icon: MessageCircle, color: "green", href: "#" }]
-            ),
+              color: "green",
+              href: makeWaUrl(cp.phone),
+              isJuknis: false
+            }))
           ];
 
           return items.map((item, i) => (
             <a 
               key={i} 
-              href={item.href} 
-              target={item.href !== '#' ? '_blank' : undefined}
-              rel={item.href !== '#' ? 'noopener noreferrer' : undefined}
-              className="flex items-center gap-4 p-5 bg-white border border-slate-200 hover:border-indigo-300 rounded-2xl transition-all shadow-sm group relative overflow-hidden"
+              href={item.isJuknis && !juknisUrl ? undefined : item.href} 
+              onClick={(e) => {
+                if (item.isJuknis && !juknisUrl) {
+                  e.preventDefault();
+                  setShowJuknisModal(true);
+                }
+              }}
+              target={item.href && item.href !== '#' ? '_blank' : undefined}
+              rel={item.href && item.href !== '#' ? 'noopener noreferrer' : undefined}
+              className="flex items-center gap-4 p-5 bg-white border border-slate-200 hover:border-indigo-300 rounded-2xl transition-all shadow-sm group relative overflow-hidden cursor-pointer"
             >
               {item.label === "Buku Panduan" && (
                 <div className="absolute top-0 left-0 w-full h-1 bg-slate-50 overflow-hidden">
@@ -1242,10 +1284,11 @@ export default function StatusCards({
                   </div>
                 );
               })()}
-              <div>
-                <h4 className="font-bold text-slate-800 text-sm">{item.label}</h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">{item.sub}</p>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">{item.label}</h4>
+                <p className="text-[11px] text-slate-400 mt-0.5 truncate">{item.sub}</p>
               </div>
+              <ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all shrink-0" />
             </a>
           ));
         })()}
@@ -1358,6 +1401,81 @@ export default function StatusCards({
           </div>
         </div>
       )}
+
+      {/* 📚 MODAL PILIH BUKU PANDUAN / JUKNIS (Bisa diakses siapa saja baik belum/sudah daftar) */}
+      {showJuknisModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[28px] max-w-lg w-full p-6 md:p-8 shadow-2xl border border-slate-100 relative animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <BookOpen size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-800">Buku Panduan & Juknis NCC 13th</h3>
+                  <p className="text-xs text-slate-400">Unduh petunjuk teknis resmi (PDF) sesuai cabang lomba</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowJuknisModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3 my-4">
+              {[
+                { name: "LKTI Nasional", sub: "16 Halaman • Panduan Karya Tulis Ilmiah", url: "/juknis/juknis-lkti.pdf" },
+                { name: "Olimpiade MIPA", sub: "8 Halaman • Silabus & Petunjuk CBT Online", url: "/juknis/juknis-olimpiade-mipa.pdf" },
+                { name: "Speech Contest", sub: "7 Halaman • Tema, Rubrik & Lembar Orisinalitas", url: "/juknis/juknis-speech.pdf" },
+                { name: "MTQ Nasional", sub: "5 Halaman • Ketentuan Maqra' & Rekaman Video", url: "/juknis/juknis-mtq.pdf" },
+              ].map((j, idx) => (
+                <a
+                  key={idx}
+                  href={j.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/30 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-slate-100 group-hover:bg-indigo-600 text-slate-600 group-hover:text-white flex items-center justify-center transition-colors">
+                      <BookOpen size={16} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
+                        Juknis {j.name}
+                      </h4>
+                      <p className="text-[11px] text-slate-400 font-medium">{j.sub}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    Unduh PDF
+                  </span>
+                </a>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+              <a
+                href="https://drive.google.com/drive/folders/1iWr9osA1ZDWEISdIMwqmvUEmmdJEx8Db?usp=drive_link"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-bold text-slate-500 hover:text-indigo-600 flex items-center gap-1.5 transition-colors"
+              >
+                <span>📁 Folder Google Drive Resmi</span>
+              </a>
+              <button
+                onClick={() => setShowJuknisModal(false)}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 }
