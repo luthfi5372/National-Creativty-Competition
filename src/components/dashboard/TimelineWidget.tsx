@@ -426,18 +426,14 @@ export default function TimelineWidget({ userCategory, userStatus, notes, global
 
   if (isInitializing) {
     return (
-      <div className="bg-white border border-slate-200 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-3xl p-8 mt-8 animate-pulse">
-        <div className="flex items-center gap-3 mb-8 pb-5 border-b border-slate-200/50">
-          <div className="w-10 h-10 bg-slate-100 rounded-xl"></div>
-          <div className="space-y-2">
-            <div className="h-4 w-48 bg-slate-100 rounded"></div>
-            <div className="h-3 w-32 bg-slate-100 rounded"></div>
-          </div>
-        </div>
-        <div className="space-y-8">
-          <div className="h-32 w-full bg-slate-50 rounded-2xl"></div>
-          <div className="h-32 w-full bg-slate-50 rounded-2xl"></div>
-        </div>
+      <div className="bg-white border border-slate-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.02)] rounded-3xl p-12 mt-8 flex flex-col items-center justify-center min-h-[340px]">
+        <div className="w-12 h-12 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin mb-4 shadow-sm" />
+        <p className="text-sm font-bold text-slate-700 tracking-wide mb-1">
+          Menyinkronkan Jadwal Perlombaan...
+        </p>
+        <p className="text-xs text-slate-400 font-medium">
+          Mengambil data timeline resmi Gelombang 1 & 2
+        </p>
       </div>
     );
   }

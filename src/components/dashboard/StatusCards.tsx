@@ -499,8 +499,13 @@ export default function StatusCards({
           <p className="text-sm text-rose-50 font-medium leading-relaxed mb-4">
             Mohon maaf, berkas Anda ditolak. Silakan periksa kembali data dan bukti pembayaran Anda.
           </p>
-          <button onClick={handleResubmit} disabled={isSubmitting} className="w-full bg-white text-rose-600 font-bold py-2.5 rounded-xl text-sm">
-            {isSubmitting ? "Memproses..." : "Ajukan Ulang Berkas"}
+          <button onClick={handleResubmit} disabled={isSubmitting} className="w-full bg-white text-rose-600 font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Memproses...
+              </>
+            ) : "Ajukan Ulang Berkas"}
           </button>
         </div>
       )}
@@ -1008,7 +1013,14 @@ export default function StatusCards({
                   <input type="text" placeholder="NISN Anggota 2" className="w-full p-2.5 bg-slate-50 border rounded-xl" value={profileForm.participant2_nisn} onChange={(e) => setProfileForm({...profileForm, participant2_nisn: e.target.value})} />
                 </div>
               )}
-              <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl">Simpan</button>
+              <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Menyimpan Profil...
+                  </>
+                ) : "Simpan"}
+              </button>
             </form>
           )}
         </div>
@@ -1098,11 +1110,16 @@ export default function StatusCards({
                 <button 
                   onClick={async () => { await handleSaveSubmissionUrl(); setIsEditingSubmission(false); }} 
                   disabled={isSavingUrl || !submissionUrl} 
-                  className={`w-full bg-blue-600 text-white font-bold py-3 rounded-xl text-xs disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors ${
+                  className={`w-full bg-blue-600 text-white font-bold py-3 rounded-xl text-xs disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 ${
                     isEditingSubmission ? '' : 'col-span-2'
                   }`}
                 >
-                  {isSavingUrl ? "Menyimpan..." : isEditingSubmission ? "Simpan Perubahan" : "Simpan Link Karya"}
+                  {isSavingUrl ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Menyimpan...
+                    </>
+                  ) : isEditingSubmission ? "Simpan Perubahan" : "Simpan Link Karya"}
                 </button>
               </div>
             </div>

@@ -280,13 +280,9 @@ export default function StudentDashboard() {
 
   if (loading || !student) {
     return (
-      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center font-sans">
-        <div className="text-center space-y-3 animate-pulse">
-          <div className="w-10 h-10 bg-indigo-100 rounded-full mx-auto flex items-center justify-center text-[#5145cd]">
-            <ClockIcon className="w-6 h-6 animate-spin" />
-          </div>
-          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Menyinkronkan Sesi...</p>
-        </div>
+      <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center font-sans space-y-4">
+        <div className="w-12 h-12 rounded-full border-4 border-indigo-100 border-t-[#5145cd] animate-spin"></div>
+        <p className="text-xs text-gray-500 font-bold uppercase tracking-widest animate-pulse">Menyinkronkan Sesi CBT...</p>
       </div>
     );
   }

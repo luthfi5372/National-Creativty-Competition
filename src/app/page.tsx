@@ -36,8 +36,25 @@ import FeatureGrid from "@/components/FeatureGrid";
 import CategoryCards from "@/components/CategoryCards";
 import Footer from "@/components/Footer";
 
-const FAQSection = dynamic(() => import("@/components/FAQSection"), { ssr: false });
-const TimelineSection = dynamic(() => import("@/components/TimelineSection"), { ssr: false });
+const FAQSection = dynamic(() => import("@/components/FAQSection"), { 
+  ssr: false,
+  loading: () => (
+    <div className="w-full max-w-7xl mx-auto min-h-[400px] flex flex-col items-center justify-center py-20">
+      <div className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-indigo-600 animate-spin mb-4" />
+      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider animate-pulse">Menyiapkan Pertanyaan Umum...</p>
+    </div>
+  )
+});
+
+const TimelineSection = dynamic(() => import("@/components/TimelineSection"), { 
+  ssr: false,
+  loading: () => (
+    <div className="w-full max-w-7xl mx-auto min-h-[450px] flex flex-col items-center justify-center py-20">
+      <div className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-indigo-600 animate-spin mb-4" />
+      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider animate-pulse">Menyiapkan Jadwal & Timeline...</p>
+    </div>
+  )
+});
 
 export default function Home() {
   return (

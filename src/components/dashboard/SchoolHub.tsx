@@ -590,7 +590,10 @@ export default function SchoolHub({ userEntry, currentUser }: SchoolHubProps) {
                       <div className="h-1.5 w-8 bg-slate-100 rounded-full animate-pulse mx-1" style={{ animationDelay: `${i * 0.15}s` }} />
                     </div>
                   ))}
-                  <p className="text-center text-[10px] text-slate-300 font-bold uppercase tracking-wider mt-2 animate-pulse">Memuat percakapan...</p>
+                  <div className="flex items-center justify-center gap-2 mt-2">
+                    <div className="w-3.5 h-3.5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Memuat percakapan...</p>
+                  </div>
                 </div>
               ) : chatError === "TableNotCreated" ? (
                 /* Graceful Setup Prompt for SQL migration */
@@ -777,9 +780,12 @@ export default function SchoolHub({ userEntry, currentUser }: SchoolHubProps) {
                     <div className="h-5 w-14 bg-slate-100 rounded-md" />
                   </div>
                 ))}
-                <p className="text-center text-[10px] text-slate-300 font-bold uppercase tracking-wider mt-1 animate-pulse">
-                  Memuat data rekan sekolah...
-                </p>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <div className="w-3.5 h-3.5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    Memuat data rekan sekolah...
+                  </p>
+                </div>
               </div>
             ) : schoolmates.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center py-10">

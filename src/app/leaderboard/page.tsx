@@ -656,12 +656,13 @@ export default function LeaderboardPage() {
               />
             </div>
           </div>
-
           <div className="space-y-3">
             {isLoading ? (
-              [...Array(5)].map((_, i) => (
-                <div key={i} className="h-20 bg-slate-50 rounded-2xl animate-pulse border border-slate-100" />
-              ))
+              <div className="py-20 flex flex-col items-center justify-center bg-white rounded-3xl border border-slate-100 shadow-sm">
+                <div className="w-10 h-10 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-3"></div>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest animate-pulse">Memuat Papan Peringkat Resmi...</p>
+                <p className="text-[11px] text-slate-400 font-medium mt-1">Mengambil data nilai & peringkat peserta</p>
+              </div>
             ) : filteredData.length > 0 ? (
               <AnimatePresence mode="popLayout">
                 {filteredData.map((item, idx) => (

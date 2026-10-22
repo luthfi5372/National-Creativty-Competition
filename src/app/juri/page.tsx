@@ -190,9 +190,10 @@ export default function JuryDashboard() {
         <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
           <AnimatePresence mode="popLayout">
             {isLoading ? (
-              [...Array(6)].map((_, i) => (
-                <div key={i} className="h-64 rounded-[2rem] bg-white/5 animate-pulse border border-white/5" />
-              ))
+              <div className="col-span-full py-20 flex flex-col items-center justify-center">
+                <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3"></div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Memuat Berkas Peserta...</p>
+              </div>
             ) : filteredEntries.length > 0 ? (
               filteredEntries.map((entry, idx) => (
                 <motion.div

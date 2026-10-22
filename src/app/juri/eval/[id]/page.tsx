@@ -143,7 +143,14 @@ export default function JuryEvaluator() {
     setIsSubmitting(false);
   };
 
-  if (isLoading) return <div className="min-h-screen bg-[#020617] flex items-center justify-center text-indigo-400 font-black animate-pulse">LOADING NCC EVALUATOR...</div>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center space-y-4">
+        <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+        <p className="text-xs font-black tracking-widest text-indigo-400 uppercase animate-pulse">Memuat Penilaian Juri NCC...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen bg-[#020617] overflow-hidden flex flex-col">
