@@ -1,68 +1,127 @@
 <p align="center">
-  <img src="public/docs/banner.jpg" alt="National Creativity Competition Banner" width="100%" style="border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.35);" />
+  <img src="public/docs/banner.jpg" alt="National Creativity Competition Banner" width="100%" style="border-radius: 16px; box-shadow: 0 16px 48px rgba(0,0,0,0.35);" />
 </p>
 
-<h1 align="center">🏆 National Creativity Competition (NCC)</h1>
+<h1 align="center">🏆 National Creativity Competition (NCC 13th)</h1>
 
 <p align="center">
-  <strong>Platform Kompetisi Nasional Full-Stack & Computer-Based Testing (CBT) Modern</strong><br>
-  Dirancang dengan Next.js 16 (App Router), Supabase PostgreSQL, Realtime Proctoring, dan Tailwind CSS v4.
+  <strong>Production-Ready Full-Stack Competition Platform & Real-Time Computer-Based Testing (CBT) System</strong><br>
+  Built with Next.js 16 (App Router), React 19, TypeScript, Supabase PostgreSQL, Realtime WebSockets, and Tailwind CSS v4.
 </p>
 
 <p align="center">
-  <a href="https://national-creativty-competition.vercel.app"><img src="https://img.shields.io/badge/Production%20Website-Live-4f46e5?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Site" /></a>
+  <a href="https://national-creativty-competition.vercel.app"><img src="https://img.shields.io/badge/Live%20Demo-Vercel%20Production-4f46e5?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
   <a href="https://github.com/luthfi5372/National-Creativty-Competition"><img src="https://img.shields.io/badge/GitHub-Repository-24292e?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" /></a>
   <img src="https://img.shields.io/badge/Next.js-16.2.4-black?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js" />
-  <img src="https://img.shields.io/badge/React-19.2-blue?style=for-the-badge&logo=react&logoColor=white" alt="React" />
-  <img src="https://img.shields.io/badge/Supabase-Database%20%26%20Auth-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
-  <img src="https://img.shields.io/badge/Tailwind%20CSS-v4.0-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind" />
+  <img src="https://img.shields.io/badge/React-19.2-0284c7?style=for-the-badge&logo=react&logoColor=white" alt="React" />
+  <img src="https://img.shields.io/badge/Supabase-PostgreSQL%20%26%20Auth-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
+  <img src="https://img.shields.io/badge/Tailwind%20CSS-v4.0-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind" />
   <img src="https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Author-Luthfi-indigo?style=for-the-badge&logo=github&logoColor=white" alt="Author" />
 </p>
+
+---
+
+## 🌟 Executive Summary & Portfolio Overview
+
+**National Creativity Competition (NCC 13th)** adalah platform web kompetisi skala nasional terintegrasi (*end-to-end competition ecosystem*) yang dirancang untuk mengelola ribuan peserta dari **34 provinsi di seluruh Indonesia**. Platform ini tidak hanya melayani pendaftaran dan pembayaran, melainkan juga menyertakan **Engine Ujian Berbasis Komputer (CBT)** berstandar olimpiade dengan sistem **Proctoring Anti-Curang Realtime**, **Admin Command Center HQ**, serta **Portal Evaluasi Juri Berbasis Rubrik**.
+
+Sistem ini dibangun dengan fokus pada performa tinggi, keamanan tingkat enterprise (*Row Level Security*), serta ketahanan terhadap kegagalan jaringan saat ujian berlangsung.
+
+### 💡 Key Engineering Feats & Solved Challenges
+
+1. **High-Concurrency Registration (Bypassing Supabase Free Email Rate Limits)**:
+   - *Problem*: Layanan email bawaan Supabase Free Tier memiliki batas ketat (3–4 email per jam), yang menyebabkan error `email rate limit exceeded` saat lonjakan pendaftaran.
+   - *Solution*: Mengarsiteki Server Action khusus berbasis **Admin Service Role API (`admin.createUser` dengan `email_confirm: true`)**. Akun peserta langsung aktif dan terverifikasi secara instan tanpa perlu memicu email konfirmasi, memungkinkan ribuan pendaftaran serentak tanpa batas.
+
+2. **Real-Time Proctoring & Anti-Cheat Radar Engine**:
+   - Sistem deteksi kecurangan otomatis berbasis *Page Visibility API*, *Window Blur Detection*, *Clipboard Interception (Anti Copy-Paste)*, serta *Fullscreen Enforcer*.
+   - Setiap pelanggaran tercatat secara instan ke WebSocket Supabase Realtime dan ditayangkan langsung di dashboard pengawas (*HQ Monitor*). Mencapai batas toleransi pelanggaran akan memicu **Auto-Submit Paksa**.
+
+3. **Zero-Latency Exam Auto-Save & Crash Recovery**:
+   - Penyimpanan jawaban otomatis ke PostgreSQL di setiap klik peserta dengan *debounce* cerdas.
+   - Logika timer cerdas berbasis *server-side elapsed time*: jika browser peserta ditutup, komputer restart, atau koneksi terputus, timer ujian akan tetap akurat saat halaman dibuka kembali tanpa reset waktu.
+
+4. **Smart Subject-Based Question Distribution (Fisher-Yates Shuffle)**:
+   - Mendukung bank soal gabungan multi-mata pelajaran (misal: Matematika 25 soal, Biologi 15 soal).
+   - Pengacakan soal dan opsi jawaban menggunakan algoritma *Fisher-Yates* terkalibrasi untuk menjamin setiap peserta menerima urutan soal unik namun dengan komposisi bobot seimbang.
+
+5. **Display-Aware Dynamic Responsive Navigation**:
+   - Bilah navigasi *floating pill* adaptif yang menyesuaikan ukuran dari layar ponsel terkecil (320px) hingga monitor 4K.
+   - Mencegah masalah umum CSS *flex-squishing* dengan strategi `shrink-0` dan transisi dinamis antar breakpoint tablet, laptop 1024px, dan desktop ultra-wide.
+
+6. **Interactive 34-Province Geospatial Analytics**:
+   - Visualisasi peta interaktif Indonesia (`<IndonesiaMap />`) berbasis SVG vektor yang memetakan persebaran demografis pendaftar secara langsung (*live streaming*).
+
+---
+
+## 📸 Visual Showcase
+
+<div align="center">
+  <h3>🛡️ Central Command HQ (Live Monitoring & Administration)</h3>
+  <img src="public/docs/hq_preview.jpg" alt="Central Command HQ Dashboard Preview" width="95%" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);" />
+  <p><em>Pusat komando admin: Verifikasi bukti bayar, manajemen peserta, live broadcast pengumuman, dan pemantauan geografis 34 provinsi.</em></p>
+</div>
+
+<br>
+
+<div align="center">
+  <h3>📝 CBT Examination Suite & Live Anti-Cheat Radar</h3>
+  <img src="public/docs/cbt_preview.jpg" alt="CBT Online Examination & Proctoring Dashboard" width="95%" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);" />
+  <p><em>Ruang pengerjaan ujian olimpiade: Rendering rumus LaTeX matematika/sains, timer real-time tersinkronisasi, dan radar indikator kecurangan.</em></p>
+</div>
 
 ---
 
 ## 📋 Daftar Isi
 
-1. [Visualisasi Arsitektur Sistem](#-visualisasi-arsitektur-sistem)
-2. [Visualisasi Database Schema (ERD)](#-visualisasi-database-schema-erd)
-3. [Alur Autentikasi & Self-Healing](#-alur-autentikasi--self-healing)
-4. [Central Command HQ (Admin Panel)](#-central-command-hq-admin-panel)
-5. [Sistem CBT & Real-Time Proctoring](#-sistem-cbt--real-time-proctoring)
-6. [Struktur Folder & Komponen](#-struktur-folder--komponen)
-7. [Environment Variables](#-environment-variables)
+1. [Fitur-Fitur Utama Platform](#-fitur-fitur-utama-platform)
+2. [Visualisasi Arsitektur Sistem](#-visualisasi-arsitektur-sistem)
+3. [Visualisasi Database Schema (ERD)](#-visualisasi-database-schema-erd)
+4. [Alur Autentikasi & Self-Healing](#-alur-autentikasi--self-healing)
+5. [Siklus Ujian CBT & Proctoring](#-siklus-ujian-cbt--proctoring)
+6. [Tech Stack & Architecture Decisions](#-tech-stack--architecture-decisions)
+7. [Struktur Folder & Komponen](#-struktur-folder--komponen)
 8. [Panduan Menjalankan Lokal](#-panduan-menjalankan-lokal)
-9. [Halaman & Route Guards](#-halaman--route-guards)
-10. [Panduan Modifikasi & Kodingan Bebas Error (Developer's Manual)](#-panduan-modifikasi--kodingan-bebas-error-developers-manual)
-    - [Tabel Referensi Cepat: "Mau Ubah Apa? Edit File Ini!"](#-tabel-referensi-cepat-mau-ubah-apa-edit-file-ini)
-    - [Aturan Emas Menghindari Kesalahan Kodingan](#-aturan-emas-menghindari-kesalahan-kodingan)
-    - [Skenario 1: Menambah Cabang Lomba Baru](#skenario-1-menambah-cabang-lomba-baru-full-stack)
-    - [Skenario 2: Menambah Kolom Baru Data Peserta](#skenario-2-menambah-kolom-baru-data-peserta-contoh-no-wa-wali--ukuran-baju)
-    - [Skenario 3: Menambah / Mengubah Akun Admin atau Juri](#skenario-3-menambah--mengubah-akun-admin-atau-juri)
-    - [Skenario 4: Mengatur Ujian CBT, Durasi, Soal Mapel, & Anti-Cheat](#skenario-4-mengatur-ujian-cbt-durasi-soal-mapel--anti-cheat)
-    - [Skenario 5: Mengubah Teks Landing Page, FAQ, Peta, & Sponsor](#skenario-5-mengubah-teks-landing-page-faq-peta--sponsor)
-    - [Skenario 6: Menambah Server Action Baru yang Aman](#skenario-6-menambah-server-action-baru-yang-aman)
-    - [Jebakan Kodingan Umum & Cara Mengatasinya](#-jebakan-kodingan-umum-gotchas--cara-mengatasinya)
-11. [Troubleshooting & Solusi Error](#-troubleshooting--solusi-error)
+9. [Environment Variables](#-environment-variables)
+10. [Halaman & Route Guards](#-halaman--route-guards)
+11. [Panduan Modifikasi & Kodingan Bebas Error (Developer's Manual)](#-panduan-modifikasi--kodingan-bebas-error-developers-manual)
+12. [Troubleshooting & Solusi Error](#-troubleshooting--solusi-error)
+13. [Profil & Kontak Pengembang](#-profil--kontak-pengembang)
+
+---
+
+## ⚡ Fitur-Fitur Utama Platform
+
+| Modul | Kemampuan & Keunggulan Teknis | File Kunci |
+|---|---|---|
+| **🌐 High-Performance Landing Page** | Animasi dinamis 60fps dengan Framer Motion, 3D Canvas ornamen, floating pill navbar adaptif, countdown kompetisi, dan integrasi WhatsApp CS. | `src/components/HomeClient.tsx`<br>`src/components/Navbar.tsx` |
+| **👤 Portal Mandiri Peserta** | Pendaftaran berbasis auto-lookup NPSN sekolah, generate Kartu Peserta ID visual, upload bukti pembayaran ke Supabase Storage, dan live timeline gelombang. | `src/app/dashboard/page.tsx`<br>`src/components/dashboard/*` |
+| **📝 CBT Online Examination Room** | Dukungan rumus matematika/fisika LaTeX (KaTeX), pengacakan opsi dan soal per mata pelajaran, auto-save jawaban ke database, serta navigasi nomor soal instan. | `src/app/ujian/[exam_id]/page.tsx` |
+| **🛡️ Real-Time Proctoring Radar** | Deteksi tab switch, anti copy-paste, fullscreen lock, counter pelanggaran dengan warning popup otomatis, dan diskualifikasi/auto-submit paksa. | `src/components/exam/CheatRadar.tsx`<br>`src/hooks/useAdvancedProctoring.ts` |
+| **👑 Central Command HQ** | Panel admin komprehensif: verifikasi slip transfer, ekspor data CSV ber-quote aman, live WebSocket monitoring ujian, dan broadcast darurat. | `src/app/hq/page.tsx`<br>`src/app/hq/llms/page.tsx` |
+| **⚖️ Portal Penjurian (Jury Hub)** | Akses juri khusus untuk menilai karya non-CBT (LKTI, Speech, MTQ), formulir skor rubrik dinamis, dan kalkulasi nilai teragregasi. | `src/app/juri/page.tsx`<br>`src/app/juri/eval/[id]/page.tsx` |
+| **🗺️ Geospatial Distribution Map** | Peta interaktif SVG 34 provinsi dengan indikator densitas pendaftar, drilldown per pulau, dan live refresh data statistik. | `src/components/IndonesiaMap.tsx` |
 
 ---
 
 ## 🏗 Visualisasi Arsitektur Sistem
 
-Diagram interaktif di bawah menggambarkan bagaimana setiap layer dari antarmuka pengguna hingga infrastruktur database terhubung secara realtime:
+Diagram berikut menggambarkan bagaimana layer antarmuka pengguna, logika server Next.js 16, dan infrastruktur backend Supabase berkomunikasi secara aman:
 
 ```mermaid
 flowchart TD
     subgraph Client["💻 BROWSER CLIENT LAYER"]
-        Landing["🌐 Landing Page (HomeClient & Canvas 3D)"]
-        Peserta["👤 Peserta Dashboard & Registration Form"]
-        ExamRoom["📝 CBT Exam Room (Cheat Radar & Smart Timer)"]
+        Landing["🌐 Landing Page (Next.js 16 Client & Framer Motion)"]
+        Peserta["👤 Peserta Dashboard & NPSN Registry Form"]
+        ExamRoom["📝 CBT Exam Room (KaTeX LaTeX & Cheat Radar)"]
         HQ["🛡️ HQ Central Command Panel (Real-Time Monitor)"]
-        Juri["⚖️ Panel Evaluasi Juri & Scoring"]
+        Juri["⚖️ Panel Evaluasi Juri & Scoring Rubric"]
     end
 
     subgraph Edge["⚡ NEXT.JS 16 & VERCEL SERVERLESS LAYER"]
         MW["🚦 Route Middleware (Route Guards, JWT & Cookie Hint)"]
-        SA["⚙️ Server Actions (auth.ts: Self-Healing & Data Sync)"]
+        SA["⚙️ Server Actions (auth.ts: Admin API & Data Sync)"]
         API["📡 API Endpoints (/api/cbt/* & /api/inspect)"]
     end
 
@@ -70,7 +129,7 @@ flowchart TD
         AuthService["🔑 Supabase Auth (JWT Engine, Auto-Confirm Admin API)"]
         Postgres[("🗄️ PostgreSQL Database (11 Relational Tables)")]
         StorageBucket["📦 Storage Buckets (Payment-Proofs, Questions, Avatars)"]
-        RealtimeEngine["⚡ Realtime Engine (WebSocket Channels for Monitoring)"]
+        RealtimeEngine["⚡ Realtime Engine (WebSocket Channels for Live Proctoring)"]
     end
 
     Landing -->|HTTPS / Next Route| MW
@@ -95,7 +154,7 @@ flowchart TD
 
 ## 🗄 Visualisasi Database Schema (ERD)
 
-Relasi antar tabel utama di PostgreSQL Supabase digambarkan pada diagram Entity-Relationship berikut:
+Skema database PostgreSQL yang menopang seluruh operasional kompetisi:
 
 ```mermaid
 erDiagram
@@ -184,7 +243,7 @@ erDiagram
 
 ## 🔑 Alur Autentikasi & Self-Healing
 
-Sistem autentikasi dilengkapi dengan mekanisme **Self-Healing** dan **Dual-Phase Token Persistence** untuk mengatasi email unconfirmed dan mismatch sesi server-client:
+Mekanisme autentikasi dilengkapi dengan **Self-Healing Session Recovery** dan **Admin API Bypass** untuk menjamin peserta tidak pernah terblokir oleh masalah konfirmasi email:
 
 ```mermaid
 sequenceDiagram
@@ -226,38 +285,9 @@ sequenceDiagram
 
 ---
 
-## 🛡 Central Command HQ (Admin Panel)
+## ⏱️ Siklus Ujian CBT & Proctoring
 
-<p align="center">
-  <img src="public/docs/hq_preview.jpg" alt="Central Command HQ Dashboard Preview" width="100%" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);" />
-</p>
-
-File Utama: `src/app/hq/page.tsx`  
-Akses: Khusus Admin (`admin@ncc.id`, `admin1@ncc.id`, `halo.ncc@gmail.com`)
-
-### Fitur-Fitur Utama HQ
-
-| Modul | Deskripsi | File Implementasi |
-|-------|-----------|-------------------|
-| **Sebaran Geografis** | Peta interaktif 34 provinsi dengan indikator kepadatan persentase pendaftar | `src/components/IndonesiaMap.tsx` |
-| **Verifikasi Pembayaran** | Approve/Reject bukti bayar slip transfer secara real-time | `src/components/hq/VerificationTab.tsx` |
-| **Participant Registry** | CRUD peserta, pencarian cerdas, filter instansi/NPSN, dan kartu peserta | `src/components/hq/UserRegistryTab.tsx` |
-| **Export Data CSV** | Unduh seluruh data registrasi dalam format CSV rapi dengan auto-quoting | `src/app/hq/page.tsx` |
-| **Live Broadcast** | Kirim pengumuman darurat langsung ke banner layar peserta | `src/app/hq/llms/broadcast/page.tsx` |
-| **QR Code Scanner** | Validasi kehadiran peserta di venue melalui pemindaian kartu ID | `html5-qrcode` integration |
-
----
-
-## 📝 Sistem CBT & Real-Time Proctoring
-
-<p align="center">
-  <img src="public/docs/cbt_preview.jpg" alt="CBT Online Examination & Proctoring Dashboard" width="100%" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);" />
-</p>
-
-File Ruang Ujian: `src/app/ujian/[exam_id]/page.tsx`  
-File Monitor Admin: `src/app/hq/llms/[exam_id]/monitor/page.tsx`
-
-### Siklus Pengerjaan Ujian (CBT Lifecycle)
+Alur pengerjaan ujian peserta mulai dari validasi token hingga auto-submit berbasis radar pelanggaran:
 
 ```mermaid
 flowchart LR
@@ -279,25 +309,41 @@ flowchart LR
 
 ---
 
+## 🛠 Tech Stack & Architecture Decisions
+
+| Kategori | Teknologi | Alasan Pemilihan & Nilai Rekayasa |
+|---|---|---|
+| **Framework** | **Next.js 16 (App Router)** | Rendering hybrid (SSR, ISR, CSR), arsitektur Server Actions yang mengamankan mutasi database tanpa eksposur endpoint publik. |
+| **Library UI** | **React 19 & TypeScript 5** | Manajemen tipe statis yang ketat untuk mencegah runtime bugs, hook performa tinggi, dan clean component hierarchy. |
+| **Styling** | **Tailwind CSS v4** | Utility-first CSS modern dengan kompilasi instan, CSS custom properties, dan dukungan penuh untuk responsive design modular. |
+| **Animasi & Interaksi**| **Framer Motion & GSAP** | Animasi transisi halaman mulus, dialog modal interaktif, dan efek hover responsif tanpa drop frame. |
+| **Database & Auth** | **Supabase (PostgreSQL 15)** | Skema relasional yang tangguh, Row Level Security (RLS), Supabase Auth dengan Admin SDK, dan Storage Buckets. |
+| **Komunikasi Realtime**| **Supabase Realtime WebSockets** | Siaran langsung data pelanggaran proctoring, live ranking ujian, dan pengumuman siaran darurat ke seluruh klien aktif. |
+| **Math Rendering** | **KaTeX** | Render persamaan matematika, rumus integral, fisika, dan kimia dalam format LaTeX dengan waktu render sub-milidetik. |
+| **Hosting & CI/CD** | **Vercel Edge Platform** | Deploy otomatis terintegrasi dengan GitHub repository, serverless edge functions dengan latensi rendah di seluruh region. |
+
+---
+
 ## 📁 Struktur Folder & Komponen
 
 ```
-National-Creativty-Competition-main/
-├── public/                           ← Aset statis (logo, gambar lomba, guidebook)
-│   ├── docs/                         ← Gambar visualisasi README
+National-Creativty-Competition/
+├── public/                           ← Aset statis publik
+│   ├── docs/                         ← Gambar dokumentasi portofolio & visualisasi
 │   │   ├── banner.jpg                ← Hero Banner NCC 2026
 │   │   ├── hq_preview.jpg            ← Preview Dashboard Central Command HQ
 │   │   └── cbt_preview.jpg           ← Preview Ruang Ujian CBT & Radar Anti-Cheat
 │   ├── mascots.png                   ← Maskot resmi Nicco & Nicci
-│   └── juknis/                       ← Petunjuk teknis PDF tiap cabang lomba
+│   ├── logo-ncc.png                  ← Logo resmi bersayap NCC 13th
+│   └── juknis/                       ← Buku panduan PDF tiap cabang lomba
 │
 ├── src/
 │   ├── app/                          ← App Router Pages
-│   │   ├── page.tsx                  ← Landing page utama
-│   │   ├── login/                    ← Form login peserta & admin
+│   │   ├── page.tsx                  ← Landing page interaktif utama
+│   │   ├── login/                    ← Form login peserta & admin (Self-Healing)
 │   │   ├── register/                 ← Form registrasi umum
-│   │   ├── daftar/                   ← Form registrasi berbasis NPSN sekolah
-│   │   ├── dashboard/                ← Portal peserta terdaftar
+│   │   ├── daftar/                   ← Form registrasi peserta berbasis NPSN
+│   │   ├── dashboard/                ← Portal peserta terdaftar (Status & ID Card)
 │   │   ├── hq/                       ← Central Command Admin HQ
 │   │   │   ├── llms/                 ← CBT Exam Manager & Question Bank
 │   │   │   │   └── [exam_id]/        ← Monitor ujian, soal, dan leaderboard
@@ -308,7 +354,7 @@ National-Creativty-Competition-main/
 │   │   └── actions/auth.ts           ← Server actions autentikasi & database
 │   │
 │   ├── components/                   ← Komponen UI Reusable
-│   │   ├── Navbar.tsx                ← Navigasi responsif dengan status login
+│   │   ├── Navbar.tsx                ← Navigasi pill responsif dinamis
 │   │   ├── HeroSection.tsx           ← Hero interaktif & CTA pendaftaran
 │   │   ├── TimelineSection.tsx       ← Timeline roadmap kegiatan NCC
 │   │   ├── CategoryCards.tsx         ← Kartu 4 cabang lomba & rincian biaya
@@ -324,9 +370,31 @@ National-Creativty-Competition-main/
 
 ---
 
+## 🚀 Panduan Menjalankan Lokal
+
+```bash
+# 1. Kloning repository dari GitHub
+git clone https://github.com/luthfi5372/National-Creativty-Competition.git
+cd National-Creativty-Competition
+
+# 2. Pasang semua dependensi
+npm install
+
+# 3. Siapkan environment variables lokal
+cp .env.example .env.local
+# Masukkan kredensial Supabase Anda di .env.local
+
+# 4. Jalankan development server
+npm run dev
+
+# 5. Akses aplikasi melalui browser di: http://localhost:3000
+```
+
+---
+
 ## 🔐 Environment Variables
 
-Konfigurasikan variabel lingkungan berikut di `.env.local` untuk lokal dan di **Vercel Project Settings > Environment Variables** untuk produksi:
+Tambahkan konfigurasi berikut pada berkas `.env.local` untuk development lokal, dan di **Vercel Settings > Environment Variables** untuk production:
 
 ```env
 # URL Instance Supabase
@@ -344,53 +412,29 @@ RESEND_API_KEY=re_xxxxxxxxxxxx
 
 ---
 
-## 🚀 Panduan Menjalankan Lokal
-
-```bash
-# 1. Kloning repository dari GitHub
-git clone https://github.com/luthfi5372/National-Creativty-Competition.git
-cd National-Creativty-Competition
-
-# 2. Pasang semua dependensi modul
-npm install
-
-# 3. Siapkan file environment variables lokal
-cp .env.example .env.local
-# Lengkapi kredensial Supabase Anda di .env.local
-
-# 4. Jalankan development server
-npm run dev
-
-# 5. Buka di browser: http://localhost:3000
-```
-
----
-
 ## 🚦 Halaman & Route Guards
 
-Sistem proteksi rute diatur secara terpusat pada file `src/middleware.ts`:
+Proteksi rute diatur secara terpusat pada file `src/middleware.ts`:
 
 | Route Path | Level Akses | Kebijakan Redirect Jika Gagal |
-|------------|-------------|-------------------------------|
+|---|---|---|
 | `/` | **Publik** | Dapat diakses siapapun |
-| `/login`, `/register`, `/daftar` | **Publik** | Jika sudah login, diarahkan ke `/dashboard` |
+| `/login`, `/register`, `/daftar` | **Publik** | Jika sudah login, diarahkan otomatis ke `/dashboard` |
 | `/dashboard/*` | **Peserta Terotentikasi** | Redirect ke `/login` jika tidak ada sesi |
-| `/hq/*` | **Khusus Admin** | Redirect ke `/login` jika anon, redirect ke `/dashboard` jika bukan admin |
-| `/juri/*` | **Admin atau Juri** | Redirect ke `/login` jika anon, redirect ke `/dashboard` jika tidak berhak |
+| `/hq/*` | **Khusus Admin** | Redirect ke `/login` jika anonim, redirect ke `/dashboard` jika bukan admin |
+| `/juri/*` | **Admin atau Juri** | Redirect ke `/login` jika anonim, redirect ke `/dashboard` jika tidak berhak |
 | `/ujian/[exam_id]` | **Peserta Terotentikasi** | Wajib verifikasi sesi akun & token ujian aktif |
 
 ---
 
 ## 🛠️ Panduan Modifikasi & Kodingan Bebas Error (Developer's Manual)
 
-Bagian ini dirancang khusus agar Anda atau pengembang lain dapat **mengubah, menambah, atau memperbaiki fitur** tanpa merusak sistem yang sudah berjalan.
-
----
+Panduan ini disusun untuk pengembang atau tim operasional yang ingin **mengubah, menambah, atau memodifikasi fitur** tanpa merusak integritas sistem yang sedang berjalan.
 
 ### 🗺️ Tabel Referensi Cepat: "Mau Ubah Apa? Edit File Ini!"
 
 | Kebutuhan Pengubahan | Lokasi Berkas Utama | Berkas Pendukung yang Harus Ikut Diedit |
-|----------------------|---------------------|-----------------------------------------|
+|---|---|---|
 | **Kategori Lomba & Biaya** | `src/components/CategoryCards.tsx` | `src/components/dashboard/RegistrationModal.tsx`, `src/app/hq/page.tsx` |
 | **Input Data Tambahan Peserta** | `src/app/dashboard/page.tsx` | `src/components/dashboard/RegistrationModal.tsx`, `src/app/hq/page.tsx` |
 | **Email Akun Admin / Juri** | `src/middleware.ts` | `src/app/actions/auth.ts`, `src/app/juri/page.tsx` |
@@ -408,13 +452,13 @@ Bagian ini dirancang khusus agar Anda atau pengembang lain dapat **mengubah, men
 
 1. **Aturan Batas Komponen ("use client" vs "use server"):**
    - Berkas dengan tanda `"use client"` **TIDAK BOLEH** mengimpor `cookies` dari `next/headers` atau memanggil kredensial `SUPABASE_SERVICE_ROLE_KEY`.
-   - Jika butuh aksi server (seperti update data berhak akses tinggi), buat fungsi di `src/app/actions/auth.ts` dengan tanda `"use server"` di baris paling atas, lalu panggil fungsi tersebut dari komponen client Anda.
+   - Gunakan Server Actions di `src/app/actions/auth.ts` dengan tanda `"use server"` untuk seluruh mutasi data dengan hak istimewa tinggi.
 
 2. **Prinsip Tiga Titik Sinkronisasi (Three-Point Sync):**
-   Setiap kali Anda menambah field data baru pada form pendaftaran:
-   - Titik 1: Tambah kolom di Database Supabase via SQL (`ALTER TABLE ...`).
-   - Titik 2: Tambahkan di React `useState` dan input tag JSX.
-   - Titik 3: Masukkan nama field tersebut pada payload `.insert({...})` atau `.update({...})`.
+   Setiap kali menambah field data baru pada form:
+   - *Titik 1*: Tambah kolom di Database Supabase via SQL (`ALTER TABLE ...`).
+   - *Titik 2*: Tambahkan di React `useState` dan input tag JSX.
+   - *Titik 3*: Masukkan nama field tersebut pada payload `.insert({...})` atau `.update({...})`.
 
 3. **Mencegah Infinite Redirect Loop di Middleware:**
    Saat memodifikasi `src/middleware.ts`, jangan pernah me-redirect ke halaman yang rutenya cocok dengan guard itu sendiri (misalnya me-redirect `/login` ke `/login`).
@@ -425,10 +469,9 @@ Bagian ini dirancang khusus agar Anda atau pengembang lain dapat **mengubah, men
 
 Misalnya Anda ingin menambah cabang lomba baru bernama **"Robotics Championship"** dengan biaya **Rp 175.000**.
 
-#### Langkah 1: Ubah Tampilan Landing Page
-Buka `src/components/CategoryCards.tsx` dan tambahkan objek baru ke dalam array `CATEGORIES`:
+#### 1. Ubah Tampilan Landing Page
+Buka `src/components/CategoryCards.tsx` dan tambahkan objek baru ke array `CATEGORIES`:
 ```tsx
-// src/components/CategoryCards.tsx
 export const CATEGORIES = [
   // ... kategori yang sudah ada ...
   {
@@ -436,42 +479,34 @@ export const CATEGORIES = [
     price: "Rp 175.000",
     color: "from-amber-500 to-orange-600",
     description: "Kompetisi rancang bangun dan pemrograman robotika inovatif tingkat nasional.",
-    icon: "Cpu", // gunakan nama ikon dari lucide-react
+    icon: "Cpu",
     guidebookUrl: "/juknis/juknis-robotics.pdf"
   }
 ];
 ```
 
-#### Langkah 2: Tambahkan Pilihan di Modal Pendaftaran Peserta
-Buka `src/components/dashboard/RegistrationModal.tsx` dan cari elemen `<select>` kategori lomba:
+#### 2. Tambahkan Pilihan di Modal Pendaftaran Peserta
+Buka `src/components/dashboard/RegistrationModal.tsx` dan tambahkan opsi di elemen `<select>`:
 ```tsx
-// src/components/dashboard/RegistrationModal.tsx
-<select
-  name="competition_type"
-  value={formData.competition_type}
-  onChange={handleInputChange}
-  className="..."
->
+<select name="competition_type" value={formData.competition_type} onChange={handleInputChange}>
   <option value="Olimpiade MIPA">Olimpiade MIPA</option>
   <option value="Speech Contest">Speech Contest</option>
   <option value="LKTI Nasional">LKTI Nasional</option>
   <option value="MTQ Nasional">MTQ Nasional</option>
-  {/* TAMBAHKAN OPSI BARU DI BAWAH INI: */}
   <option value="Robotics Championship">Robotics Championship</option>
 </select>
 ```
 
-#### Langkah 3: Tambahkan Filter di Admin HQ
-Buka `src/app/hq/page.tsx` dan cari daftar tab/filter kategori pendaftar:
+#### 3. Tambahkan Filter di Admin HQ
+Buka `src/app/hq/page.tsx` dan tambahkan kategori baru pada `CATEGORY_FILTERS`:
 ```tsx
-// src/app/hq/page.tsx
 const CATEGORY_FILTERS = [
   "Semua",
   "Olimpiade MIPA",
   "Speech Contest",
   "LKTI Nasional",
   "MTQ Nasional",
-  "Robotics Championship" // ← Tambahkan ini agar admin bisa memfilter pendaftar robotika
+  "Robotics Championship"
 ];
 ```
 
@@ -479,277 +514,116 @@ const CATEGORY_FILTERS = [
 
 ### Skenario 2: Menambah Kolom Baru Data Peserta (Contoh: No. WA Wali & Ukuran Baju)
 
-Misalnya Anda butuh mendata **Nomor WhatsApp Orang Tua (`parent_whatsapp`)** dan **Ukuran Kaos (`shirt_size`)**.
-
-#### Langkah 1: Jalankan SQL di Supabase SQL Editor
-Buka dashboard Supabase > SQL Editor > Jalankan perintah:
+#### 1. Jalankan SQL di Supabase SQL Editor
 ```sql
 ALTER TABLE competition_entries 
 ADD COLUMN IF NOT EXISTS parent_whatsapp TEXT,
 ADD COLUMN IF NOT EXISTS shirt_size VARCHAR(10);
 ```
 
-#### Langkah 2: Perbarui State Form di Dashboard Peserta
-Buka `src/app/dashboard/page.tsx` dan perbarui state `formData`:
+#### 2. Perbarui State Form di Dashboard Peserta
+Buka `src/app/dashboard/page.tsx` dan masukkan field baru pada `formData`:
 ```tsx
-// src/app/dashboard/page.tsx
 const [formData, setFormData] = useState({
   full_name: "",
   school_name: "",
-  nisn: "",
-  province: "",
   competition_type: "Olimpiade MIPA",
-  mentor_name: "",
-  mentor_email: "",
-  mentor_phone: "",
-  // TAMBAHKAN DUA FIELD BARU DI SINI:
-  parent_whatsapp: "",
-  shirt_size: "L",
+  parent_whatsapp: "", // ← Field baru
+  shirt_size: "L",      // ← Field baru
 });
 ```
 
-Dan pada fungsi `handleSubmitEntry`, sertakan kolom tersebut pada objek Supabase `.insert`:
+Dan pada `handleSubmitEntry`:
 ```tsx
-const { data, error } = await supabase
-  .from('competition_entries')
-  .insert([{
-    user_id: currentUser.id,
-    full_name: formData.full_name,
-    school_name: formData.school_name,
-    parent_whatsapp: formData.parent_whatsapp, // ← Kolom baru
-    shirt_size: formData.shirt_size,           // ← Kolom baru
-    // ...field lainnya...
-  }]);
+await supabase.from('competition_entries').insert([{
+  user_id: currentUser.id,
+  full_name: formData.full_name,
+  parent_whatsapp: formData.parent_whatsapp,
+  shirt_size: formData.shirt_size,
+}]);
 ```
 
-#### Langkah 3: Tambahkan Input Tag di Modal Formulir
-Buka `src/components/dashboard/RegistrationModal.tsx` dan tambahkan field input:
+#### 3. Tambahkan Input di Modal Formulir (`src/components/dashboard/RegistrationModal.tsx`)
 ```tsx
-{/* Input No WA Orang Tua */}
-<div>
-  <label className="text-xs font-bold text-slate-700">No. WhatsApp Orang Tua / Wali</label>
-  <input
-    type="tel"
-    placeholder="08xxxxxxxxxx"
-    value={formData.parent_whatsapp || ""}
-    onChange={(e) => setFormData({ ...formData, parent_whatsapp: e.target.value })}
-    className="w-full mt-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm"
-    required
-  />
-</div>
-
-{/* Pilihan Ukuran Kaos */}
-<div>
-  <label className="text-xs font-bold text-slate-700">Ukuran Kaos Peserta</label>
-  <select
-    value={formData.shirt_size || "L"}
-    onChange={(e) => setFormData({ ...formData, shirt_size: e.target.value })}
-    className="w-full mt-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm"
-  >
-    <option value="S">S (Small)</option>
-    <option value="M">M (Medium)</option>
-    <option value="L">L (Large)</option>
-    <option value="XL">XL (Extra Large)</option>
-    <option value="XXL">XXL</option>
-  </select>
-</div>
+<input
+  type="tel"
+  placeholder="No. WhatsApp Orang Tua / Wali"
+  value={formData.parent_whatsapp || ""}
+  onChange={(e) => setFormData({ ...formData, parent_whatsapp: e.target.value })}
+  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm"
+  required
+/>
 ```
-
-#### Langkah 4: Tampilkan di Tabel & Ekspor CSV Admin HQ
-Buka `src/app/hq/page.tsx`:
-1. Pada modal detail peserta, tambahkan:
-   ```tsx
-   <p><strong>WA Wali:</strong> {selectedParticipant?.parent_whatsapp || '-'}</p>
-   <p><strong>Ukuran Kaos:</strong> {selectedParticipant?.shirt_size || '-'}</p>
-   ```
-2. Pada fungsi download CSV (`handleExportCSV`), tambahkan header dan value:
-   ```tsx
-   // Tambahkan ke baris header CSV:
-   "Nama,Email,Sekolah,Kategori,WA Wali,Ukuran Kaos,Status"
-   
-   // Tambahkan ke mapping data:
-   `"${p.full_name}","${p.email}","${p.school_name}","${p.competition_type}","${p.parent_whatsapp || '-'}","${p.shirt_size || '-'}","${p.payment_status}"`
-   ```
 
 ---
 
 ### Skenario 3: Menambah / Mengubah Akun Admin atau Juri
 
-Untuk memberikan hak akses Admin atau Juri kepada akun baru, Anda **wajib mendaftarkan email tersebut di 3 berkas**:
-
-#### 1. Berkas `src/middleware.ts` (Route Guard)
-```typescript
-// Cari array ADMIN_EMAILS dan JURI_EMAILS di bagian atas file:
-const ADMIN_EMAILS = [
-  "admin@ncc.id", 
-  "admin1@ncc.id", 
-  "halo.ncc@gmail.com",
-  "adminbaru@ncc.id" // ← Tambahkan email admin baru di sini
-];
-
-const JURI_EMAILS = [
-  "juri1@ncc.id", 
-  "juri2@ncc.id",
-  "juribaru@ncc.id"  // ← Tambahkan email juri baru di sini
-];
-```
-
-#### 2. Berkas `src/app/actions/auth.ts` (Login Handler)
-```typescript
-// Cari array adminEmails di dalam fungsi loginLocalUser:
-const adminEmails = [
-  "admin@ncc.id", 
-  "admin1@ncc.id", 
-  "halo.ncc@gmail.com",
-  "adminbaru@ncc.id" // ← Tambahkan di sini agar bypass & cookie admin aktif
-];
-```
-
-#### 3. Berkas `src/app/juri/page.tsx` & `src/app/juri/eval/[id]/page.tsx`
-```typescript
-// Tambahkan email juri pada array JURI_EMAILS di kedua file tersebut:
-const JURI_EMAILS = [
-  "juri1@ncc.id", 
-  "juri2@ncc.id", 
-  "juribaru@ncc.id"
-];
-```
+Daftarkan email baru di **3 berkas** berikut:
+1. `src/middleware.ts` (`ADMIN_EMAILS` atau `JURI_EMAILS`)
+2. `src/app/actions/auth.ts` (`adminEmails` dalam `loginLocalUser`)
+3. `src/app/juri/page.tsx` & `src/app/juri/eval/[id]/page.tsx` (`JURI_EMAILS`)
 
 ---
 
 ### Skenario 4: Mengatur Ujian CBT, Durasi, Soal Mapel, & Anti-Cheat
 
 #### Mengubah Toleransi Peringatan Curang
-Buka `src/app/ujian/[exam_id]/page.tsx` dan cari konstanta batas pelanggaran:
+Buka `src/app/ujian/[exam_id]/page.tsx`:
 ```typescript
-// src/app/ujian/[exam_id]/page.tsx
-const MAX_VIOLATIONS = 3; 
-// 💡 Ubah angka 3 di atas jika ingin memberikan toleransi lebih longgar (misal 5)
-// atau lebih ketat (misal 1 kali langsung auto-submit).
+const MAX_VIOLATIONS = 3; // Ubah angka toleransi (misal 5, atau 1 untuk ujian ketat)
 ```
 
-#### Mengatur Pengambilan Soal Acak per Mata Pelajaran (Mapel)
-Admin dapat mengatur pembagian soal langsung melalui antarmuka web di `/hq/llms`:
+#### Pengambilan Soal Acak per Mata Pelajaran (Mapel)
+Admin dapat mengatur pembagian soal langsung dari web `/hq/llms`:
 1. Klik sesi ujian > **Edit Pengaturan Ujian**.
-2. Pada bagian **Pengaturan Soal**, klik **Tambah Mata Pelajaran**.
-3. Masukkan nama mapel dan kuota jumlah soal (misal: *Matematika: 25*, *Biologi: 15*).
-4. Saat peserta membuka ujian, fungsi **Fisher-Yates Shuffle** di `src/app/ujian/[exam_id]/page.tsx` akan otomatis mengambil acak sesuai jumlah yang ditentukan dari bank soal database:
-   ```typescript
-   // Logika smart shuffle di src/app/ujian/[exam_id]/page.tsx:
-   const pool = qData.filter((q) => (q.subject || '').toLowerCase() === name.toLowerCase());
-   picked.push(...fyShuffle(pool).slice(0, count));
-   ```
+2. Di bagian **Pengaturan Soal**, klik **Tambah Mata Pelajaran**.
+3. Tentukan nama mapel dan kuota soal (misal: *Matematika: 25*, *Biologi: 15*).
+4. Saat peserta memulai ujian, fungsi Fisher-Yates di `src/app/ujian/[exam_id]/page.tsx` akan mengambil acak dari bank soal sesuai kuota mapel yang ditentukan.
 
 ---
 
-### Skenario 5: Mengubah Teks Landing Page, FAQ, Peta, & Sponsor
-
-#### 1. Mengubah Banner / Teks Utama Hero
-Buka `src/components/HeroSection.tsx`:
-- Cari teks `National Creativity Competition` untuk mengubah judul.
-- Cari teks `Daftar Sekarang` untuk mengubah tombol Call to Action (CTA).
-
-#### 2. Mengubah FAQ (Tanya Jawab)
-Buka `src/components/FAQSection.tsx` dan edit array `faqs`:
-```tsx
-const faqs = [
-  {
-    q: "Apakah kompetisi ini bersertifikat resmi?",
-    a: "Ya, seluruh peserta dan pemenang akan menerima e-sertifikat resmi berskala nasional."
-  },
-  // Tambah pertanyaan & jawaban baru di sini
-];
-```
-
-#### 3. Mengubah Logo Sponsor
-Buka `src/components/SponsorsSection.tsx`:
-- Letakkan file gambar logo sponsor di dalam folder `public/sponsors/nama_sponsor.png`.
-- Daftarkan path tersebut pada array sponsor di dalam komponen.
-
----
-
-### Skenario 6: Menambah Server Action Baru yang Aman
-
-Gunakan template di bawah ini saat ingin membuat Server Action baru di `src/app/actions/auth.ts`:
-
-```typescript
-// src/app/actions/auth.ts
-"use server";
-
-import { createClient } from "@/lib/supabase/server";
-
-export async function updateParticipantStatus(entryId: string, newStatus: string) {
-  try {
-    // 1. Inisialisasi klien Supabase server-side yang aman
-    const supabase = await createClient();
-
-    // 2. Validasi parameter input
-    if (!entryId || !newStatus) {
-      return { success: false, error: "Parameter tidak lengkap." };
-    }
-
-    // 3. Jalankan mutasi database
-    const { error } = await supabase
-      .from('competition_entries')
-      .update({ payment_status: newStatus, updated_at: new Date().toISOString() })
-      .eq('id', entryId);
-
-    if (error) throw error;
-
-    return { success: true };
-  } catch (err: any) {
-    console.error("[Action Error] updateParticipantStatus:", err);
-    return { success: false, error: err.message || "Gagal memperbarui status." };
-  }
-}
-```
-
-Panggil dari Client Component:
-```tsx
-"use client";
-import { updateParticipantStatus } from "@/app/actions/auth";
-
-const handleStatusChange = async (id: string) => {
-  const res = await updateParticipantStatus(id, "Verified");
-  if (res.success) {
-    alert("Berhasil diperbarui!");
-  } else {
-    alert("Error: " + res.error);
-  }
-};
-```
-
----
-
-### ⚠️ Jebakan Kodingan Umum (Gotchas) & Cara Mengatasinya
+### ⚠️ Jebakan Kodingan Umum (Gotchas) & Solusinya
 
 | Masalah / Error | Penyebab | Solusi Tepat |
-|-----------------|----------|--------------|
-| **`Hydration failed because initial UI does not match server`** | Membaca `localStorage`, `window.innerWidth`, atau `new Date()` langsung saat inisialisasi render. | Pindahkan pembacaan `localStorage` / `window` ke dalam hook `useEffect()`. |
-| **`Cookies can only be modified in a Server Action`** | Mencoba memanggil `cookieStore.set()` dari Client Component atau fungsi biasa. | Jalankan mutasi cookie hanya di dalam file dengan direktif `"use server"` atau di `src/middleware.ts`. |
-| **`new row violates row-level security policy`** | Tabel Supabase memiliki RLS tetapi tidak ada policy `INSERT` yang mengizinkan aksi tersebut. | Buka Supabase SQL Editor dan jalankan `CREATE POLICY "Allow all" ON nama_tabel FOR ALL USING (true) WITH CHECK (true);`. |
-| **Nilai Nilai Ujian NaN Saat Update** | Penggunaan `parseInt("")` menghasilkan `NaN`, dan `NaN ?? 0` tetap `NaN`. | Gunakan `Number(val) || 0` bukan `parseInt(val) ?? 0`. |
-| **Realtime Channel Menumpuk (Memory Leak)** | Membuka `supabase.channel()` di dalam `useEffect` tanpa fungsi pembersihan (*cleanup*). | Selalu return `() => { supabase.removeChannel(channel); }` di akhir blok `useEffect`. |
+|---|---|---|
+| **`Hydration failed`** | Membaca `localStorage`, `window.innerWidth`, atau `new Date()` langsung pada render pertama. | Pindahkan akses `window` atau `localStorage` ke dalam `useEffect()`. |
+| **`Cookies can only be modified in a Server Action`** | Memanggil `cookieStore.set()` dari Client Component. | Panggil mutasi cookie hanya di file dengan direktif `"use server"` atau di `middleware.ts`. |
+| **`new row violates row-level security policy`** | Kebijakan RLS tabel Supabase belum mengizinkan aksi `INSERT`. | Tambahkan policy `FOR ALL USING (true) WITH CHECK (true)` di Supabase SQL Editor. |
+| **Nilai Ujian NaN Saat Update** | `parseInt("")` bernilai `NaN`, dan `NaN ?? 0` tetap `NaN`. | Gunakan `Number(val) || 0` bukan `parseInt(val) ?? 0`. |
+| **Channel Realtime Menumpuk (Memory Leak)** | Membuka `supabase.channel()` di `useEffect` tanpa fungsi cleanup. | Selalu sertakan `return () => { supabase.removeChannel(channel); }` di akhir `useEffect`. |
 
 ---
 
 ## 🐛 Troubleshooting & Solusi Error
 
-### 🔴 Masalah 1: Peserta Bisa Daftar tapi Tidak Bisa Login
-- **Penyebab**: Email Supabase memerlukan verifikasi manual sementara user belum klik tautan konfirmasi.
-- **Solusi yang Diterapkan**: Server action `loginLocalUser` dan `syncEntryOnDaftar` telah dilengkapi **Auto-Confirm Email via Admin API**. Pastikan variable `SUPABASE_SERVICE_ROLE_KEY` telah terpasang di Vercel Dashboard agar fungsi auto-confirm aktif di serverless.
+### 🔴 Masalah 1: Pendaftaran Gagal "email rate limit exceeded"
+- **Penyebab**: Supabase Auth bawaan mengirim email verifikasi dengan batas gratis 3–4 email per jam.
+- **Solusi**: Sistem telah dirombak menggunakan **Server Action `registerParticipantAction`** yang memanfaatkan Supabase Admin API (`admin.createUser` dengan `email_confirm: true`). Tidak ada email yang dikirim, akun langsung aktif, dan bebas rate limit selamanya.
 
 ### 🔴 Masalah 2: Sesi Peserta Hilang Saat Masuk Halaman Dashboard
 - **Penyebab**: Session cookie Supabase hanya tersimpan di server header dan belum tersinkronisasi di storage browser.
-- **Solusi**: Form login (`src/app/login/LoginForm.tsx`) kini menjalankan `signInWithPassword` dua tahap: validasi via Server Action, lalu locking session langsung melalui browser Supabase Client.
+- **Solusi**: Form login (`src/app/login/LoginForm.tsx`) menjalankan login 2 tahap: verifikasi via Server Action lalu locking sesi langsung melalui browser Supabase Client.
 
 ### 🔴 Masalah 3: Soal Ujian dengan Gambar Gagal Diunggah
 - **Penyebab**: Bucket storage `question-images` di Supabase belum dibuat atau policy RLS-nya terbatas.
-- **Solusi**: Pastikan bucket `question-images` berstatus **Public** dan memiliki policy `FOR ALL USING (true) WITH CHECK (true)` pada Supabase SQL Editor.
+- **Solusi**: Buat bucket `question-images` berstatus **Public** dengan policy `FOR ALL USING (true) WITH CHECK (true)` pada Supabase SQL Editor.
+
+---
+
+## 👨‍💻 Profil & Kontak Pengembang
+
+Proyek ini dirancang, dikembangkan, dan dioptimasi oleh:
+
+- **Pengembang**: **Luthfi**
+- **Peran**: Full-Stack Engineer / System Architect
+- **GitHub**: [@luthfi5372](https://github.com/luthfi5372)
+- **Repository**: [National-Creativty-Competition](https://github.com/luthfi5372/National-Creativty-Competition)
+- **Keahlian**: Next.js (App Router), React 19, TypeScript, PostgreSQL (Supabase), Realtime WebSockets, UI/UX Engineering, System Architecture.
 
 ---
 
 <p align="center">
-  <sub>Dibuat dengan dedikasi untuk kesuksesan <strong>National Creativity Competition</strong>.</sub><br>
-  <sub>© 2026 Tim Pengembang NCC. Hak cipta dilindungi.</sub>
+  <sub>Dibuat dengan dedikasi penuh untuk kesuksesan <strong>National Creativity Competition (NCC 13th)</strong>.</sub><br>
+  <sub>© 2026 Luthfi. All rights reserved.</sub>
 </p>

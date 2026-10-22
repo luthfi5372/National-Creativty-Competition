@@ -26,7 +26,7 @@ const stats = [
     borderColor: "border-blue-100",
     accentFrom: "from-blue-400",
     accentTo: "to-blue-600",
-    desc: "Siswa SMA/SMK sederajat dari seluruh Indonesia bertanding dalam bidang Sains.",
+    desc: "Siswa SMP/MTs sederajat dari seluruh Indonesia bertanding dalam bidang Sains.",
   },
   {
     category: "Speech Contest",

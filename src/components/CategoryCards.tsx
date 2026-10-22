@@ -68,8 +68,11 @@ export default function CategoryCards() {
         {categories.map((cat, i) => {
           const Icon = cat.icon;
           return (
-            <motion.div
+            <motion.a
               key={cat.id}
+              href={cat.juknis}
+              target="_blank"
+              rel="noopener noreferrer"
               initial={{ opacity: 0, y: 30, scale: 0.95 }}
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: true, margin: "-50px" }}
@@ -104,22 +107,16 @@ export default function CategoryCards() {
 
               {/* Action links */}
               <div className="flex items-center gap-4 w-full flex-wrap">
-                <a
-                  href={cat.juknis}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all border border-slate-200 hover:border-slate-300"
-                >
+                <span className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 group-hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all border border-slate-200 group-hover:border-slate-300">
                   <FileText size={14} />
                   <span>Lihat Juknis</span>
-                </a>
+                </span>
                 <div className={`inline-flex items-center gap-2 text-sm font-medium transition-all duration-300 group-hover:gap-3 ${cat.color}`}>
                   <span>Selengkapnya</span>
                   <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
                 </div>
               </div>
-            </motion.div>
+            </motion.a>
           );
         })}
       </div>
