@@ -474,12 +474,12 @@ export default function UserDashboard() {
                         <h3 className="text-xl font-black tracking-tight">Portal Ujian CBT (LLMS)</h3>
                         <span className="px-2 py-0.5 bg-rose-500 text-[9px] font-black uppercase tracking-widest rounded animate-pulse shadow-sm">Live</span>
                       </div>
-                      <p className="text-xs text-indigo-100 font-medium">Simulasi Olimpiade MIPA Gel 2 aktif. Masuk menggunakan ID-TICKET dan Passcode Anda.</p>
+                      <p className="text-xs text-indigo-100 font-medium">Ujian CBT Olimpiade MIPA aktif. Masuk menggunakan ID-TICKET dan Passcode Anda.</p>
                     </div>
                   </div>
 
                   <a 
-                    href="https://testmoz.com/15721622"
+                    href="https://testmoz.com/q/NationalCreativityCompetitionTest"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full md:w-auto px-6 py-3.5 bg-white text-[#5145cd] text-xs font-black uppercase tracking-widest rounded-xl hover:bg-gray-50 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center space-x-2 shrink-0 cursor-pointer"
