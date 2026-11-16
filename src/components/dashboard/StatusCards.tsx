@@ -1426,10 +1426,10 @@ export default function StatusCards({
 
             <div className="space-y-3 my-4">
               {[
-                { name: "LKTI Nasional", sub: "16 Halaman • Panduan Karya Tulis Ilmiah", url: "/juknis/juknis-lkti.pdf" },
+                { name: "LKTI Nasional", sub: "19 Halaman • Panduan Karya Tulis Ilmiah", url: "/juknis/juknis-lkti.pdf" },
                 { name: "Olimpiade MIPA", sub: "8 Halaman • Silabus & Petunjuk CBT Online", url: "/juknis/juknis-olimpiade-mipa.pdf" },
-                { name: "Speech Contest", sub: "7 Halaman • Tema, Rubrik & Lembar Orisinalitas", url: "/juknis/juknis-speech.pdf" },
-                { name: "MTQ Nasional", sub: "5 Halaman • Ketentuan Maqra' & Rekaman Video", url: "/juknis/juknis-mtq.pdf" },
+                { name: "Speech Contest", sub: "10 Halaman • Tema, Rubrik & Lembar Orisinalitas", url: "/juknis/juknis-speech.pdf" },
+                { name: "MTQ Nasional", sub: "6 Halaman • Ketentuan Maqra' & Rekaman Video", url: "/juknis/juknis-mtq.pdf" },
               ].map((j, idx) => (
                 <a
                   key={idx}
