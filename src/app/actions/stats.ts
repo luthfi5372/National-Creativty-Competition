@@ -3,15 +3,6 @@
 import { unstable_cache } from 'next/cache';
 import { createClient as createBaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-disabled.supabase.co";
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
-
-// Create a cookie-free base client using service role key if available to bypass RLS
-const baseSupabase = createBaseClient(supabaseUrl, serviceRoleKey || anonKey, {
-  auth: { autoRefreshToken: false, persistSession: false }
-});
-
 const PROVINCE_TO_REGION: Record<string, string> = {
   "DI. ACEH": "Sumatera", "SUMATERA UTARA": "Sumatera", "SUMATERA BARAT": "Sumatera", "RIAU": "Sumatera", "JAMBI": "Sumatera", "SUMATERA SELATAN": "Sumatera", "BENGKULU": "Sumatera", "LAMPUNG": "Sumatera", "BANGKA BELITUNG": "Sumatera", "KEPULAUAN RIAU": "Sumatera",
   "DKI JAKARTA": "Jawa", "JAWA BARAT": "Jawa", "JAWA TENGAH": "Jawa", "DAERAH ISTIMEWA YOGYAKARTA": "Jawa", "JAWA TIMUR": "Jawa", "PROBANTEN": "Jawa",
@@ -30,12 +21,23 @@ export interface GlobalStats {
   detailedProvinceStats: Record<string, number>;
 }
 
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-disabled.supabase.co";
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
+
+  return createBaseClient(supabaseUrl, serviceRoleKey || anonKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  });
+}
+
 // Cache the public statistics query using a cookie-free client
 const getCachedEntries = unstable_cache(
   async () => {
-    const { data: supabaseEntries, error } = await baseSupabase
+    const supabase = getSupabaseClient();
+    const { data: supabaseEntries, error } = await supabase
       .from("competition_entries")
-      .select("category, competition_type, city, province, payment_status");
+      .select("category, competition_type, city, province, school_name, payment_status");
 
     if (error) {
       console.error("Supabase cached stats fetch error in action:", error);
@@ -58,15 +60,13 @@ export async function getLiveStatsAction(): Promise<GlobalStats> {
   };
 
   try {
-    // Fetch cached entries without cookie dependency
     const supabaseEntries = await getCachedEntries();
 
     if (!supabaseEntries || supabaseEntries.length === 0) {
       return defaultStats;
     }
 
-    // Hitung SEMUA pendaftar (termasuk Pending, Verified, dll) - jangan filter berdasarkan payment_status
-    // Hanya exclude yang Rejected saja
+    // Hitung semua peserta aktif (kecualikan yang Rejected)
     const allEntries = supabaseEntries.filter(e => e.payment_status !== 'Rejected');
 
     const breakdown = { "Olimpiade MIPA": 0, "Speech Contest": 0, "LKTI Nasional": 0, "MTQ Nasional": 0 };
@@ -75,32 +75,65 @@ export async function getLiveStatsAction(): Promise<GlobalStats> {
     const activeProvinces = new Set<string>();
 
     allEntries.forEach(entry => {
-      // Normalisasi Kategori Bidang Lomba
-      let cat = (entry.competition_type || entry.category || "")?.trim();
-      if (cat === "MTQ") cat = "MTQ Nasional";
-      if (cat === "LKTI") cat = "LKTI Nasional";
-      if (cat === "MIPA") cat = "Olimpiade MIPA";
+      // 1. Normalisasi Kategori Bidang Lomba
+      const catRaw = (entry.competition_type || entry.category || "")?.trim().toUpperCase();
+      let cat = "";
+      if (catRaw.includes("SPEECH")) {
+        cat = "Speech Contest";
+      } else if (catRaw.includes("MIPA") || catRaw.includes("OLIMPIADE")) {
+        cat = "Olimpiade MIPA";
+      } else if (catRaw.includes("MTQ")) {
+        cat = "MTQ Nasional";
+      } else if (catRaw.includes("LKTI")) {
+        cat = "LKTI Nasional";
+      }
 
-      if ((breakdown as any)[cat] !== undefined) (breakdown as any)[cat]++;
+      if (cat && (breakdown as any)[cat] !== undefined) {
+        (breakdown as any)[cat]++;
+      }
       
-      // Normalisasi Nama Provinsi agar sinkron dengan ID Map
-      let prov = (entry.province || entry.city)?.toUpperCase()?.trim();
-      
-      if (prov) {
-        // Fallback mapping untuk variasi nama provinsi ke ID Map D3
-        if (prov === "ACEH") prov = "DI. ACEH";
-        if (prov === "DI YOGYAKARTA" || prov === "YOGYAKARTA") prov = "DAERAH ISTIMEWA YOGYAKARTA";
-        if (prov === "KEPULAUAN BANGKA BELITUNG") prov = "BANGKA BELITUNG";
-        if (prov === "PROVINSI BANTEN" || prov === "BANTEN") prov = "PROBANTEN";
-        if (prov === "NUSA TENGGARA BARAT") prov = "NUSATENGGARA BARAT";
-        if (prov === "PAPUA BARAT" || prov === "PAPUA BARAT DAYA") prov = "IRIAN JAYA BARAT";
-        if (prov === "PAPUA TENGAH" || prov === "PAPUA PEGUNUNGAN") prov = "IRIAN JAYA TENGAH";
-        if (prov === "PAPUA" || prov === "PAPUA SELATAN") prov = "IRIAN JAYA TIMUR";
+      // 2. Normalisasi Nama Provinsi agar 100% sinkron dengan D3 GeoJSON Map
+      let prov = (entry.province || "")?.toUpperCase()?.trim();
+      const city = (entry.city || "")?.toUpperCase()?.trim();
+      const school = (entry.school_name || "")?.toUpperCase()?.trim();
+
+      // Fallback jika provinsi berisi tanda "-" atau kosong
+      if (!prov || prov === "-" || prov === "UNDEFINED") {
+        prov = city;
+      }
+      if (!prov || prov === "-" || prov === "UNDEFINED") {
+        if (/JOMBANG|DARUL ULUM|MALANG|KEDIRI|SURABAYA|JEMBER|NGANJUK|MADIUN|SIDOARJO|MOJOKERTO|BLITAR|PASURUAN|PONOROGO/i.test(school)) {
+          prov = "JAWA TIMUR";
+        } else if (/JAKARTA/i.test(school)) {
+          prov = "DKI JAKARTA";
+        } else if (/BANDUNG|BOGOR|BEKASI|DEPOK/i.test(school)) {
+          prov = "JAWA BARAT";
+        } else if (/SEMARANG|SOLO|SURAKARTA/i.test(school)) {
+          prov = "JAWA TENGAH";
+        }
+      }
+
+      if (prov && prov !== "-") {
+        // Pemetaan variasi nama provinsi ke fitur koordinat peta D3
+        if (prov === "ACEH" || prov === "NANGGROE ACEH DARUSSALAM") prov = "DI. ACEH";
+        else if (prov === "DI YOGYAKARTA" || prov === "YOGYAKARTA" || prov === "DIY") prov = "DAERAH ISTIMEWA YOGYAKARTA";
+        else if (prov.includes("BANGKA")) prov = "BANGKA BELITUNG";
+        else if (prov === "PROVINSI BANTEN" || prov === "BANTEN") prov = "PROBANTEN";
+        else if (prov === "NUSA TENGGARA BARAT" || prov === "NTB") prov = "NUSATENGGARA BARAT";
+        else if (prov === "NUSA TENGGARA TIMUR" || prov === "NTT") prov = "NUSA TENGGARA TIMUR";
+        else if (prov === "KEPULAUAN RIAU" || prov === "KEPRI") prov = "RIAU";
+        else if (prov === "KALIMANTAN UTARA" || prov === "KALTARA") prov = "KALIMANTAN TIMUR";
+        else if (prov === "SULAWESI BARAT" || prov === "SULBAR") prov = "SULAWESI SELATAN";
+        else if (/PAPUA BARAT|PAPUA BARAT DAYA/i.test(prov)) prov = "IRIAN JAYA BARAT";
+        else if (/PAPUA TENGAH|PAPUA PEGUNUNGAN/i.test(prov)) prov = "IRIAN JAYA TENGAH";
+        else if (/PAPUA|PAPUA SELATAN/i.test(prov)) prov = "IRIAN JAYA TIMUR";
         
         activeProvinces.add(prov);
         detailedStats[prov] = (detailedStats[prov] || 0) + 1;
         const region = PROVINCE_TO_REGION[prov] || "Jawa";
-        if ((regionStats as any)[region] !== undefined) (regionStats as any)[region]++;
+        if ((regionStats as any)[region] !== undefined) {
+          (regionStats as any)[region]++;
+        }
       }
     });
 
