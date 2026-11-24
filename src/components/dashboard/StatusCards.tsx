@@ -292,26 +292,10 @@ export default function StatusCards({
     
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabase
-        .from('competition_entries')
-        .update({
-          full_name: profileForm.full_name,
-          school_name: profileForm.school_name,
-          school: profileForm.school_name, // Sinkronisasi kolom 'school' lama demi integritas modul lain
-          phone: profileForm.phone,
-          nisn: profileForm.nisn,
-          province: profileForm.province,
-          team_name: profileForm.team_name,
-          participant2_name: profileForm.participant2_name,
-          participant2_nisn: profileForm.participant2_nisn
-        })
-        .eq('id', userEntry?.id)
-        .select();
-
-      if (error) throw error;
-      
-      if (!data || data.length === 0) {
-        throw new Error("Izin update ditolak. Pastikan skrip SQL RLS sudah dijalankan di Supabase SQL Editor.");
+      const { updateParticipantProfileServerAction } = await import('@/app/actions/auth');
+      const res = await updateParticipantProfileServerAction(userEntry?.id, profileForm);
+      if (!res.success) {
+        throw new Error(res.error || "Gagal memperbarui profil.");
       }
       
       showToast("Profil berhasil diperbarui!", "success");
@@ -378,24 +362,18 @@ export default function StatusCards({
 
     setIsUploadingPayment(true);
     try {
-      const fileExt = paymentFile.name.split('.').pop();
-      const fileName = `${userEntry?.id}-payment-${Math.random()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('payment-proofs').upload(fileName, paymentFile);
-      if (uploadError) throw uploadError;
+      const formData = new FormData();
+      formData.append('file', paymentFile);
+      formData.append('entryId', String(userEntry?.id));
 
-      const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(fileName);
-      const photoUrl = urlData.publicUrl;
+      const { uploadPaymentProofServerAction } = await import('@/app/actions/auth');
+      const res = await uploadPaymentProofServerAction(formData);
 
-      const { error: dbError } = await supabase
-        .from('competition_entries')
-        .update({
-          payment_proof_url: photoUrl,
-          payment_status: 'Pending'
-        })
-        .eq('id', userEntry?.id);
+      if (!res.success || !res.url) {
+        throw new Error(res.error || "Gagal mengunggah bukti pembayaran.");
+      }
 
-      if (dbError) throw dbError;
-
+      const photoUrl = res.url;
       showToast("Bukti transfer berhasil diunggah! Menunggu verifikasi admin.", "success");
       setUserEntry((prev: any) => ({
         ...prev,
@@ -406,9 +384,6 @@ export default function StatusCards({
     } catch (err: any) {
       console.error("Upload payment error:", err);
       let errMsg = err.message || "Kesalahan tidak dikenal";
-      if (errMsg.toLowerCase().includes("bucket") || errMsg.toLowerCase().includes("not_found") || errMsg.toLowerCase().includes("not found")) {
-        errMsg = "Bucket 'payment-proofs' tidak ditemukan di database Supabase. Silakan hubungi admin untuk menjalankan migrasi database/storage.";
-      }
       showToast(`Gagal mengunggah bukti: ${errMsg}`, "error");
     } finally {
       setIsUploadingPayment(false);
@@ -1141,10 +1116,10 @@ export default function StatusCards({
           // Map kategori lomba ke file juknis PDF
           const getJuknisUrl = () => {
             const cat = (userEntry?.competition_type || userEntry?.category || '').toLowerCase();
-            if (cat.includes('lkti')) return '/juknis/juknis-lkti.pdf';
-            if (cat.includes('mipa') || cat.includes('olimpiade')) return '/juknis/juknis-olimpiade-mipa.pdf';
-            if (cat.includes('speech')) return '/juknis/juknis-speech.pdf';
-            if (cat.includes('mtq')) return '/juknis/juknis-mtq.pdf';
+            if (cat.includes('lkti')) return '/JUKNIS REVISI 1/JUKNIS_LKTI_2026-2027_teks_editable.pdf';
+            if (cat.includes('mipa') || cat.includes('olimpiade')) return '/JUKNIS REVISI 1/JUKNIS OLIMPIADE 2026-2027 fiks .pdf';
+            if (cat.includes('speech')) return '/JUKNIS REVISI 1/JUKNIS SPEECH 2026-2027 TERBARU.pdf';
+            if (cat.includes('mtq')) return '/JUKNIS REVISI 1/JUKNIS_MTQ_2026-2027_background_lengkap.pdf';
             return null;
           };
           const juknisUrl = getJuknisUrl();
@@ -1426,10 +1401,10 @@ export default function StatusCards({
 
             <div className="space-y-3 my-4">
               {[
-                { name: "LKTI Nasional", sub: "19 Halaman • Panduan Karya Tulis Ilmiah", url: "/juknis/juknis-lkti.pdf" },
-                { name: "Olimpiade MIPA", sub: "8 Halaman • Silabus & Petunjuk CBT Online", url: "/juknis/juknis-olimpiade-mipa.pdf" },
-                { name: "Speech Contest", sub: "10 Halaman • Tema, Rubrik & Lembar Orisinalitas", url: "/juknis/juknis-speech.pdf" },
-                { name: "MTQ Nasional", sub: "6 Halaman • Ketentuan Maqra' & Rekaman Video", url: "/juknis/juknis-mtq.pdf" },
+                { name: "LKTI Nasional", sub: "19 Halaman • Panduan Karya Tulis Ilmiah", url: "/JUKNIS REVISI 1/JUKNIS_LKTI_2026-2027_teks_editable.pdf" },
+                { name: "Olimpiade MIPA", sub: "8 Halaman • Silabus & Petunjuk CBT Online", url: "/JUKNIS REVISI 1/JUKNIS OLIMPIADE 2026-2027 fiks .pdf" },
+                { name: "Speech Contest", sub: "10 Halaman • Tema, Rubrik & Lembar Orisinalitas", url: "/JUKNIS REVISI 1/JUKNIS SPEECH 2026-2027 TERBARU.pdf" },
+                { name: "MTQ Nasional", sub: "6 Halaman • Ketentuan Maqra' & Rekaman Video", url: "/JUKNIS REVISI 1/JUKNIS_MTQ_2026-2027_background_lengkap.pdf" },
               ].map((j, idx) => (
                 <a
                   key={idx}

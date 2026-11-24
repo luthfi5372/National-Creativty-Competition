@@ -2641,5 +2641,115 @@ export async function bulkDeleteParticipantsServerAction(entries: { id: number |
   }
 }
 
+/** 💳 Server Action: Upload Bukti Pembayaran Peserta (Bypass RLS) */
+export async function uploadPaymentProofServerAction(formData: FormData) {
+  try {
+    const file = formData.get('file') as File;
+    const entryId = formData.get('entryId') as string;
+
+    if (!file || !entryId) {
+      return { success: false, url: null, error: "File bukti pembayaran atau ID peserta tidak valid." };
+    }
+
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const fileName = `${entryId}-payment-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    // 1. Upload ke bucket payment-proofs (Bypass RLS dengan service_role)
+    const { error: uploadError } = await client.storage
+      .from('payment-proofs')
+      .upload(fileName, buffer, {
+        contentType: file.type || 'image/jpeg',
+        upsert: true
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = client.storage
+      .from('payment-proofs')
+      .getPublicUrl(fileName);
+
+    const photoUrl = urlData.publicUrl;
+
+    // 2. Update competition_entries
+    const { error: dbError } = await client
+      .from('competition_entries')
+      .update({
+        payment_proof_url: photoUrl,
+        payment_status: 'Pending'
+      })
+      .eq('id', entryId);
+
+    if (dbError) throw dbError;
+
+    return { success: true, url: photoUrl, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception uploadPaymentProofServerAction:", err);
+    return { success: false, url: null, error: err.message || "Gagal mengunggah bukti pembayaran." };
+  }
+}
+
+/** 👤 Server Action: Perbarui Profil Peserta (Bypass RLS & Sinkronkan Profiles) */
+export async function updateParticipantProfileServerAction(entryId: number | string, profileData: any) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const client = serviceRoleKey
+      ? createSupabaseClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        })
+      : createSupabaseClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
+
+    // 1. Update competition_entries
+    const { data: entry, error: entryErr } = await client
+      .from('competition_entries')
+      .update({
+        full_name: profileData.full_name,
+        school_name: profileData.school_name,
+        school: profileData.school_name,
+        phone: profileData.phone,
+        nisn: profileData.nisn,
+        province: profileData.province,
+        team_name: profileData.team_name,
+        participant2_name: profileData.participant2_name,
+        participant2_nisn: profileData.participant2_nisn
+      })
+      .eq('id', entryId)
+      .select('id, user_id')
+      .single();
+
+    if (entryErr) throw entryErr;
+
+    // 2. Jika ada user_id, sinkronkan juga ke tabel profiles
+    if (entry?.user_id) {
+      await client
+        .from('profiles')
+        .update({
+          full_name: profileData.full_name,
+          school: profileData.school_name
+        })
+        .eq('id', entry.user_id);
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    console.error("[Server Action] Exception updateParticipantProfileServerAction:", err);
+    return { success: false, error: err.message || "Gagal memperbarui profil." };
+  }
+}
+
+
 
 
